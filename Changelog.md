@@ -1,5 +1,13 @@
 # Genie Assistant Changelog
 
+## [Alpha V1.005] - 2026-03-11 21:12:00
+
+### 🔄 Build Update
+- **Summary**: `pdfParse is not a function` 에러 해결을 위한 패키지 다운그레이드
+- **Detail** : 
+  - `pdf-parse` 최신 버전(v2.4.5)의 ES 모듈 호환성 문제로 인해 Next.js 환경에서 구조분해 할당(export) 문제가 발생. 안정적인 구버전(v1.1.1)으로 강등하여 정상적인 함수 호출이 가능하도록 조치.
+- **Build Time**: 2026-03-11 21:12:00
+
 ## [Alpha V1.004] - 2026-03-11 20:56:00
 
 ### 🔄 Build Update
