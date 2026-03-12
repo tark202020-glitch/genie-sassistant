@@ -1,5 +1,13 @@
 # Genie Assistant Changelog
 
+## [Alpha V1.006] - 2026-03-11 21:51:00
+
+### 🔄 Build Update
+- **Summary**: RAG 파일 업로드 진행 프로세스 및 에러 메시지 한글화 적용
+- **Detail** : 
+  - `/api/ingest/route.ts` 서버 측 콘솔 로그 및 클라이언트 반환 에러 메시지들을 영문에서 한글로 전면 번역 및 반영하여 인지 과정 향상
+- **Build Time**: 2026-03-11 21:51:00
+
 ## [Alpha V1.005] - 2026-03-11 21:12:00
 
 ### 🔄 Build Update
