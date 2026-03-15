@@ -1,127 +1,499 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { GoogleGenerativeAIStream, StreamingTextResponse } from 'ai';
 import { createClient } from '@supabase/supabase-js';
-import { GoogleGenerativeAIEmbeddings } from '@langchain/google-genai';
+import { generateEmbedding } from '@/lib/embeddings';
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY || '');
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 );
 
-const embeddings = new GoogleGenerativeAIEmbeddings({
-  apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
-  modelName: 'text-embedding-004',
-});
+// pgvector 유사도 검색
+async function searchByVector(
+  query: string,
+  assistantId?: string | null,
+  docTypeFilter?: 'script' | 'reference' | 'all' | null,
+  matchCount: number = 10
+): Promise<string> {
+  console.log(`[RAG] 벡터 검색 시작 | 쿼리: "${query}" | 보조작가: ${assistantId || '없음'} | 필터: ${docTypeFilter || 'all'} | 검색수: ${matchCount}`);
 
-export const runtime = 'edge';
+  try {
+    // 질문을 임베딩
+    const queryEmbedding = await generateEmbedding(query);
+
+    // 레벨1 검색 (공유 지식 — assistant_id가 NULL인 문서)
+    const { data: level1Results, error: l1Err } = await supabase.rpc('match_documents', {
+      query_embedding: JSON.stringify(queryEmbedding),
+      match_threshold: 0.2,
+      match_count: matchCount,
+      filter_assistant_id: null,
+      filter_doc_type: (docTypeFilter && docTypeFilter !== 'all') ? docTypeFilter : null,
+    });
+
+    if (l1Err) console.error('[RAG] 레벨1 검색 오류:', l1Err.message);
+    console.log(`[RAG] 레벨1 검색: ${level1Results?.length || 0}개 결과`);
+
+    // 레벨2 검색 (보조작가 전용 지식)
+    let level2Results: any[] = [];
+    let assistantName = '';
+    if (assistantId) {
+      // 보조작가 이름 조회
+      const { data: assistant } = await supabase
+        .from('assistants')
+        .select('name')
+        .eq('id', assistantId)
+        .single();
+      assistantName = assistant?.name || '';
+
+      const { data: l2Data, error: l2Err } = await supabase.rpc('match_documents', {
+        query_embedding: JSON.stringify(queryEmbedding),
+        match_threshold: 0.2,
+        match_count: matchCount,
+        filter_assistant_id: assistantId,
+        filter_doc_type: (docTypeFilter && docTypeFilter !== 'all') ? docTypeFilter : null,
+      });
+
+      if (l2Err) console.error('[RAG] 레벨2 검색 오류:', l2Err.message);
+      level2Results = l2Data || [];
+      console.log(`[RAG] 레벨2 검색 (${assistantName}): ${level2Results.length}개 결과`);
+    }
+
+    // 결과 합치기 (레벨2 우선)
+    const allContexts: string[] = [];
+
+    for (const r of level2Results) {
+      const label = `전문자료(${assistantName})`;
+      allContexts.push(`[${label} - ${r.source_file}] (유사도: ${(r.similarity * 100).toFixed(1)}%)\n${r.content}`);
+    }
+
+    for (const r of (level1Results || [])) {
+      allContexts.push(`[공유자료 - ${r.source_file}] (유사도: ${(r.similarity * 100).toFixed(1)}%)\n${r.content}`);
+    }
+
+    if (allContexts.length > 0) {
+      return allContexts.join('\n---\n');
+    }
+    return '';
+
+  } catch (err: any) {
+    console.error('[RAG] 벡터 검색 실패:', err.message);
+
+    return '';
+  }
+}
+
+export const maxDuration = 300; // 대본 비교 등 대용량 처리용
+
+/**
+ * 특정 source_file의 전체 청크를 순서대로 복원하여 풀텍스트 반환
+ * - assistantId 지정 시: 해당 보조작가 문서 우선 → 없으면 공유 문서에서 검색
+ */
+async function getFullDocumentText(sourceFile: string, assistantId?: string | null): Promise<string> {
+  // 1차: assistantId 지정 시 보조작가 문서에서 검색
+  if (assistantId) {
+    const { data, error } = await supabase
+      .from('documents')
+      .select('content')
+      .eq('source_file', sourceFile)
+      .eq('assistant_id', assistantId)
+      .order('id', { ascending: true });
+
+    if (!error && data && data.length > 0) {
+      console.log(`[FullText] ${sourceFile}: ${data.length}개 청크 복원 (보조작가)`);
+      return data.map(d => d.content).join('\n');
+    }
+  }
+
+  // 2차: 공유 문서에서 검색 (폴백)
+  const { data, error } = await supabase
+    .from('documents')
+    .select('content')
+    .eq('source_file', sourceFile)
+    .is('assistant_id', null)
+    .order('id', { ascending: true });
+
+  if (error) {
+    console.error(`[FullText] ${sourceFile} 조회 오류:`, error.message);
+    return '';
+  }
+
+  if (!data || data.length === 0) return '';
+  console.log(`[FullText] ${sourceFile}: ${data.length}개 청크 복원 (공유)`);
+  return data.map(d => d.content).join('\n');
+}
+
+/**
+ * 업로드된 문서 목록 조회 (보조작가/공유 구분)
+ * - assistantId 지정 시: 보조작가 문서와 공유 문서를 분리하여 반환
+ */
+async function listUploadedDocuments(assistantId?: string | null): Promise<{ assistantFiles: string[]; sharedFiles: string[] }> {
+  const assistantFiles: string[] = [];
+  const sharedFiles: string[] = [];
+
+  // 보조작가 문서
+  if (assistantId) {
+    const { data } = await supabase
+      .from('documents')
+      .select('source_file')
+      .eq('assistant_id', assistantId)
+      .order('source_file', { ascending: true });
+    if (data) assistantFiles.push(...[...new Set(data.map(d => d.source_file))]);
+  }
+
+  // 공유 문서
+  const { data: sharedData } = await supabase
+    .from('documents')
+    .select('source_file')
+    .is('assistant_id', null)
+    .order('source_file', { ascending: true });
+  if (sharedData) sharedFiles.push(...[...new Set(sharedData.map(d => d.source_file))]);
+
+  return { assistantFiles, sharedFiles };
+}
 
 export async function POST(req: Request) {
-  const { messages } = await req.json();
+  const { messages, assistantId } = await req.json();
 
   // 1. 사용자 마지막 메시지를 추출
   const lastUserMessage = messages.filter((m: any) => m.role === 'user').pop()?.content || '';
 
-  // 2. 인텐트(Intent) 라우팅을 위한 가벼운 판단 요청 모델 생성
+  // 보조작가 정보 조회
+  let assistantInfo: any = null;
+  if (assistantId) {
+    const { data } = await supabase
+      .from('assistants')
+      .select('*')
+      .eq('id', assistantId)
+      .single();
+    assistantInfo = data;
+  }
+
+  // 2. 인텐트(Intent) 라우팅 — 대본/자료 분석 분리
   const routerModel = genAI.getGenerativeModel({ 
     model: 'gemini-2.5-flash',
     generationConfig: { responseMimeType: "application/json" }
   });
 
-  const routerPrompt = `
-  다음 사용자 메시지를 분석하여 3가지 카테고리 중 하나로 분류하세요.
-  1. "conversation": 단순한 인사, 일상 대화, 격려 요청, 짧은 질문.
-  2. "search": 특정 작법 이론(예: 캐릭터 결핍, 미드포인트), 도메인 지식, 정보나 팁을 묻는 질문.
-  3. "analyze": 작성한 캐릭터 설정, 대본/플롯 초안 등을 평가, 피드백, глубо 분석해달라는 요청.
+  // 업로드된 문서 목록 조회 (비교 인텐트 판별용)
+  const { assistantFiles, sharedFiles } = await listUploadedDocuments(assistantId);
+  const allFiles = [...assistantFiles, ...sharedFiles];
+  let fileListStr = '';
+  if (assistantId && assistantFiles.length > 0) {
+    // ★ 보조작가 활성 시: 보조작가 전용 문서만 표시 (공유 문서 제외하여 잘못된 선택 방지)
+    fileListStr = assistantFiles.join(', ');
+  } else {
+    fileListStr = allFiles.length > 0 ? allFiles.join(', ') : '없음';
+  }
 
+  const routerPrompt = `
+  다음 사용자 메시지를 분석하여 6가지 카테고리 중 하나로 분류하세요.
+  1. "conversation": 단순한 인사, 일상 대화, 격려 요청, 날씨 등 일반적인 잡담.
+  2. "search": 특정 정보를 묻는 질문, 업로드된 문서에 대한 일반적 질문, 지식이나 자료를 검색해야 하는 질문.
+  3. "analyze_script": 대본(시나리오/각본/스크립트) 하나에 대한 분석 요청. 예: 미드포인트 분석, 캐릭터 아크, 플롯 구조, 서사 흐름.
+  4. "analyze_reference": 참고자료에 대한 분석, 요약, 정리 요청.
+  5. "analyze": 사용자가 직접 작성한 새 캐릭터 설정/대본 초안/플롯을 메시지에 포함하여 평가/피드백을 요청하는 경우.
+  6. "compare_scripts": 두 개 이상의 대본/버전을 비교하는 요청. 예: "V4.8과 V4.9 차이점", "1부와 2부 비교", "두 대본의 달라진 점", "버전 차이 분석" 등.
+
+  중요 판별 규칙:
+  - "비교", "차이점", "달라진", "변경사항", "수정사항", "vs", "VS", "대비", "비교해" 키워드 → "compare_scripts"
+  - 두 버전/문서를 언급하며 비교를 요청하면 → "compare_scripts"
+  - 단일 대본 분석(비교 아님) → "analyze_script"
+  - "자료", "논문", "배경" 키워드 → "analyze_reference"
+  - 사용자가 직접 작성한 텍스트 평가 → "analyze"
+  
+  현재 업로드된 문서 목록:
+  ${fileListStr}
+  
+  compare_scripts인 경우 비교할 파일명도 함께 반환하세요.
+  ${assistantId ? '중요: 보조작가가 활성화 상태입니다. 반드시 [보조작가 전용 문서] 목록에서 파일을 선택하세요. [공유 문서]에서는 선택하지 마세요.' : ''}
   응답 형식은 반드시 다음과 같은 JSON 포맷이어야 합니다:
-  {"intent": "conversation" | "search" | "analyze"}
+  {"intent": "...", "files": ["file1.pdf", "file2.pdf"]}
+  files는 compare_scripts일 때만 필수이며, 위 문서 목록에서 가장 유사한 파일명을 선택하세요.
+  다른 인텐트에서는 files를 빈 배열([])로 반환하세요.
   
   사용자 메시지: "${lastUserMessage}"
   `;
 
-  // 라우팅 결과 도출
-  let intent = "conversation"; // 기본값
+  let intent = "conversation";
+  let compareFiles: string[] = [];
   try {
     const routerResult = await routerModel.generateContent(routerPrompt);
     const routerResponseText = routerResult.response.text();
     const parsedIntent = JSON.parse(routerResponseText);
-    if (["conversation", "search", "analyze"].includes(parsedIntent.intent)) {
+    if (["conversation", "search", "analyze_script", "analyze_reference", "analyze", "compare_scripts"].includes(parsedIntent.intent)) {
       intent = parsedIntent.intent;
     }
-    console.log("[Intent Router] Classified as:", intent);
+    if (parsedIntent.files && Array.isArray(parsedIntent.files)) {
+      compareFiles = parsedIntent.files;
+    }
+    console.log("[Intent Router] Classified as:", intent, compareFiles.length > 0 ? `| 비교 파일: ${compareFiles}` : '');
   } catch (error) {
-    console.error("[Intent Router] Classification failed, fallback to conversation", error);
+    console.error("[Intent Router] Classification failed, fallback to search", error);
+    intent = "search";
   }
 
-  // 3. 인텐트에 따른 모델 및 시스템 프롬프트(Persona) 분기
+  // 3. 보조작가 페르소나 기반 시스템 프롬프트 구성
+  const assistantName = assistantInfo?.name || '블랙위도우';
+  const assistantPersona = assistantInfo?.persona || '';
+  const assistantSpecialty = assistantInfo?.specialty || '';
+
+  const markdownInstruction = `
+답변은 반드시 Markdown 형식으로 작성하세요. 다음 규칙을 따르세요:
+- 주요 주제는 ### 제목을 사용하세요.
+- 핵심 키워드나 중요한 부분은 **볼드체**로 강조하세요.
+- 항목을 나열할 때는 번호 목록(1. 2. 3.) 또는 bullet 목록(- 또는 *)을 사용하세요.
+- 구분이 필요한 섹션 사이에는 --- 구분선을 사용하세요.
+- 인용이 필요할 때는 > 인용 블록을 사용하세요.
+- 대본이나 코드 형태의 내용은 코드 블록(\`\`\`으로 감싸기)을 사용하세요.
+`;
+
+  let basePersona = '';
+  if (assistantInfo) {
+    basePersona = `당신은 "${assistantName}"이라는 전문 보조작가입니다.
+    전문 분야: ${assistantSpecialty}
+    ${assistantPersona ? `페르소나: ${assistantPersona}` : ''}
+    사용자의 질문에 당신의 전문 분야에 맞는 깊이 있는 답변을 제공해주세요.
+    ${markdownInstruction}`;
+  } else {
+    basePersona = `당신은 시나리오/드라마 작가를 돕는 '블랙위도우' 보조작가입니다.
+    ${markdownInstruction}`;
+  }
+
   let targetModelName = 'gemini-2.5-flash';
   let systemPrompt = '';
 
   switch (intent) {
+    case 'compare_scripts': {
+      // 대본 비교: 전체 텍스트 복원 후 비교 (RAG 미사용)
+      console.log(`[Compare] 대본 비교 시작 | 파일: ${compareFiles.join(', ')}`);
+      console.log(`[Compare] 🔍 assistantId: ${assistantId || '없음'} | 보조작가 문서: [${assistantFiles.join(', ')}] | 공유 문서: [${sharedFiles.join(', ')}]`);
+
+      // ★ 보조작가 활성 시: 인텐트 라우터가 선택한 파일이 보조작가 문서인지 검증
+      let validatedFiles = compareFiles;
+      if (assistantId && assistantFiles.length > 0) {
+        validatedFiles = compareFiles.filter(f => assistantFiles.includes(f));
+        if (validatedFiles.length < compareFiles.length) {
+          console.log(`[Compare] ⚠️ 보조작가 문서 필터링: ${compareFiles.join(', ')} → ${validatedFiles.join(', ') || '없음'} (공유 문서 제외)`);
+        }
+      }
+
+      let fullTexts: { name: string; text: string }[] = [];
+
+      if (validatedFiles.length >= 2) {
+        // 검증된 파일명으로 비교
+        for (const fileName of validatedFiles.slice(0, 2)) {
+          const text = await getFullDocumentText(fileName, assistantId);
+          if (text) fullTexts.push({ name: fileName, text });
+        }
+      }
+
+      // 파일이 부족하면 보조작가 문서에서 우선 자동 선택
+      if (fullTexts.length < 2) {
+        const searchPool = assistantId && assistantFiles.length >= 2 ? assistantFiles : allFiles;
+        console.log(`[Compare] 파일 자동 탐색... ${assistantId && assistantFiles.length >= 2 ? '보조작가 전용' : '전체'} 목록에서 선택`);
+        fullTexts = [];
+        for (const fileName of searchPool.slice(0, 2)) {
+          const text = await getFullDocumentText(fileName, assistantId);
+          if (text) fullTexts.push({ name: fileName, text });
+        }
+      }
+
+      if (fullTexts.length < 2) {
+        systemPrompt = `${basePersona}
+        사용자가 대본 비교를 요청했지만, 비교할 수 있는 대본이 2개 이상 업로드되어 있지 않습니다.
+        현재 업로드된 문서: ${allFiles.join(', ') || '없음'}
+        비교하려면 2개 이상의 대본을 업로드해달라고 안내하세요.`;
+      } else {
+        console.log(`[Compare] 비교 대상: ${fullTexts[0].name} (${fullTexts[0].text.length}자) vs ${fullTexts[1].name} (${fullTexts[1].text.length}자)`);
+
+        systemPrompt = `${basePersona}
+        당신은 대본 비교 전문가입니다.
+        아래 두 대본의 **전체 텍스트**가 제공됩니다. 처음부터 끝까지 꼼꼼히 읽고 비교 분석하세요.
+
+        ## 비교 분석 지침
+        1. **장면(S#) 단위로** 순서대로 비교하세요
+        2. **추가된 장면**: 한쪽에만 있는 새로운 장면
+        3. **삭제된 장면**: 이전 버전에 있었지만 삭제된 장면
+        4. **수정된 대사**: 문장, 조사, 단어 하나라도 달라진 부분을 찾으세요
+        5. **수정된 지문**: 행동, 표정, 장소 설명의 변경
+        6. **구조적 변경**: 장면 순서 변경, 통합, 분리
+        7. 각 변경에 대해 **작가의 의도**를 추론하세요
+
+        ## 출력 형식
+        - 변경 사항을 장면 순서대로 정리
+        - 각 변경마다 변경 전/후를 인용하여 비교
+        - 마지막에 전체 변경의 방향성과 의미를 요약
+
+        ---
+        ## 📄 대본 A: ${fullTexts[0].name}
+        ${fullTexts[0].text}
+
+        ---
+        ## 📄 대본 B: ${fullTexts[1].name}
+        ${fullTexts[1].text}`;
+      }
+
+      targetModelName = 'gemini-2.5-flash'; // 대용량 컨텍스트 지원
+      break;
+    }
+
+    case 'analyze_script': {
+      // 대본 분석: 전체 텍스트 복원 (RAG 부분 검색 대신 전체 대본 사용)
+      let scriptFullTexts: { name: string; text: string }[] = [];
+      
+      // 보조작가 대본 전체 복원
+      const scriptPool = assistantId && assistantFiles.length > 0 ? assistantFiles : allFiles.filter(f => !f.includes('reference'));
+      for (const fileName of scriptPool) {
+        const text = await getFullDocumentText(fileName, assistantId);
+        if (text) scriptFullTexts.push({ name: fileName, text });
+      }
+
+      if (scriptFullTexts.length > 0) {
+        // 전체 대본 텍스트를 시스템 프롬프트에 포함
+        const allScriptText = scriptFullTexts
+          .map(s => `=== 📜 ${s.name} (${s.text.length}자) ===\n${s.text}`)
+          .join('\n\n---\n\n');
+        
+        console.log(`[Analyze Script] 전체 대본 ${scriptFullTexts.length}개 로드 (총 ${allScriptText.length}자)`);
+
+        systemPrompt = `${basePersona}
+        당신은 대본/시나리오 전문 분석가입니다. 
+        사용자가 요청한 대본 분석을 수행하세요.
+        
+        중요: 아래에 대본의 **전체 텍스트**가 제공됩니다. 
+        처음부터 끝까지 꼼꼼히 읽고, 사용자의 질문에 맞는 정확한 분석을 제공하세요.
+        대본의 일부만 보고 답변하지 마세요.
+        
+        분석 시 다음 관점들을 고려하세요:
+        - 서사 구조 (3막 구조, 미드포인트, 시퀀스 분석)
+        - 캐릭터 아크 (변화, 성장, 결핍과 극복)
+        - 갈등 구조 (내적/외적 갈등, 대립 관계)
+        - 대사 분석 (서브텍스트, 캐릭터성 반영)
+        - 장면 전환 및 리듬
+        
+        [전체 대본]
+        ${allScriptText}`;
+      } else {
+        // 대본이 없는 경우 RAG 폴백
+        const scriptContext = await searchByVector(lastUserMessage, assistantId, 'script', 20);
+        systemPrompt = `${basePersona}
+        사용자가 대본 분석을 요청했지만, 업로드된 대본을 찾을 수 없습니다.
+        사용 가능한 참고 자료를 기반으로 최선의 답변을 제공하세요.
+
+        [참고 자료]
+        ${scriptContext || '검색 결과 없음'}`;
+      }
+
+      targetModelName = 'gemini-2.5-flash'; // 대용량 컨텍스트 지원 (1M 토큰)
+      break;
+    }
+
+    case 'analyze_reference': {
+      // 자료 분석: 전체 텍스트 복원
+      let refFullTexts: { name: string; text: string }[] = [];
+      
+      // 참고자료 파일 목록 (assistant 문서 중 reference 타입 또는 공유 문서)
+      if (assistantId) {
+        // 보조작가의 reference 문서 조회
+        const { data: refDocs } = await supabase
+          .from('documents')
+          .select('source_file')
+          .eq('assistant_id', assistantId)
+          .eq('doc_type', 'reference');
+        const refFiles = [...new Set((refDocs || []).map(d => d.source_file))];
+        
+        for (const fileName of refFiles) {
+          const text = await getFullDocumentText(fileName, assistantId);
+          if (text) refFullTexts.push({ name: fileName, text });
+        }
+      }
+      
+      // 공유 문서도 포함
+      if (refFullTexts.length === 0) {
+        for (const fileName of sharedFiles.slice(0, 5)) {
+          const text = await getFullDocumentText(fileName, null);
+          if (text) refFullTexts.push({ name: fileName, text });
+        }
+      }
+
+      if (refFullTexts.length > 0) {
+        const allRefText = refFullTexts
+          .map(s => `=== 📚 ${s.name} (${s.text.length}자) ===\n${s.text}`)
+          .join('\n\n---\n\n');
+
+        console.log(`[Analyze Ref] 전체 자료 ${refFullTexts.length}개 로드 (총 ${allRefText.length}자)`);
+
+        systemPrompt = `${basePersona}
+        사용자가 업로드한 참고자료를 기반으로 답변하세요.
+        
+        중요: 아래에 참고자료의 **전체 텍스트**가 제공됩니다.
+        처음부터 끝까지 읽고, 사용자의 질문에 정확히 답변하세요.
+        
+        참고자료 분석 시 다음을 수행하세요:
+        - 자료의 핵심 내용을 정확히 파악하고 전달
+        - 사용자의 질문에 맞는 정보를 자료에서 추출
+        - 필요시 요약, 정리, 비교 분석 수행
+        - 자료의 출처와 맥락을 명시
+
+        [전체 참고 자료]
+        ${allRefText}`;
+      } else {
+        const refContext = await searchByVector(lastUserMessage, assistantId, 'reference', 15);
+        systemPrompt = `${basePersona}
+        사용자가 자료 분석을 요청했지만, 업로드된 참고자료를 찾을 수 없습니다.
+        사용 가능한 정보를 기반으로 최선의 답변을 제공하세요.
+
+        [참고 자료]
+        ${refContext || '검색 결과 없음'}`;
+      }
+
+      targetModelName = 'gemini-2.5-flash';
+      break;
+    }
+
     case 'analyze':
-      // 심층 분석 트랙 (Phase 4 대비)
-      targetModelName = 'gemini-2.5-pro'; // 분석은 Pro 모델을 쓴다고 가정 (현재 없으면 에러날 수 있으나 계획에 따름)
-      systemPrompt = `당신은 시나리오/드라마 대본을 심층 분석하는 'Genie(제니)'입니다.
-      사용자가 제공한 대본, 스토리, 캐릭터 설정을 분석하여 구조적 결함(예: 미드포인트 부족, 플롯 구멍)을 짚어내고
+      systemPrompt = `${basePersona}
+      사용자가 제공한 대본, 스토리, 캐릭터 설정을 분석하여 구조적 결함을 짚어내고
       밀도 높은 전문가적 피드백과 대안을 제시하세요. 분석은 냉정하지만 말투는 건설적이어야 합니다.`;
       break;
 
-    case 'search':
-      // 지식 기반 트랙 (Phase 3 RAG 연동)
-      targetModelName = 'gemini-2.5-flash';
-      let retrievedContext = '';
-      
-      try {
-        // 1. 사용자 질문을 벡터로 변환
-        const queryEmbedding = await embeddings.embedQuery(lastUserMessage);
-        
-        // 2. Supabase pgvector 유사도 검색(match_documents params) 수행
-        const { data: matchData, error: matchError } = await supabase.rpc('match_documents', {
-          query_embedding: queryEmbedding,
-          match_count: 5,
-        });
+    case 'search': {
+      // 전체 검색 (대본 + 자료 통합)
+      const retrievedContext = await searchByVector(lastUserMessage, assistantId, 'all', 10);
 
-        if (matchError) {
-          console.error('[RAG Error] Failed to match documents:', matchError);
-        } else if (matchData && matchData.length > 0) {
-          retrievedContext = matchData.map((d: any) => d.content).join('\n---\n');
-          console.log(`[RAG] Retrieved ${matchData.length} chunks via Similarity Search.`);
-        }
-      } catch (err) {
-        console.error('[RAG Exception]', err);
-      }
+      systemPrompt = `${basePersona}
+      사용자의 질문에 대해 하단의 [참고 자료]를 바탕으로 정확히 답변해주세요.
+      [참고 자료]에서 찾은 내용이 있다면 반드시 그것을 기반으로 답변하세요.
+      [참고 자료]에 질문과 직접적으로 관련된 내용이 없다면, 그 사실을 언급하고 당신이 가진 일반 지식으로 보충하세요.
 
-      systemPrompt = `당신은 시나리오 작법서와 이론에 해박한 'Genie(제니)'입니다.
-      사용자가 묻는 이론적 개념이나 자료 서칭 요청에 대해 하단의 [참고 자료]를 바탕으로 핵심을 요약하고 구체적인 예시를 들어 명확히 설명해주세요.
-      [참고 자료]에 질문과 직접적으로 관련된 내용이 부족하다면, 당신이 가진 보편적인 시나리오 도메인 지식을 추가로 활용하되, 가급적 제공된 문헌을 우선하세요.
-
-      [참고 자료(데이터베이스 검색 결과)]
+      [참고 자료]
       ${retrievedContext ? retrievedContext : '검색 결과 없음'}`;
       break;
+    }
 
     case 'conversation':
     default:
-      // 일상 대화 트랙 (기본)
-      targetModelName = 'gemini-2.5-flash';
-      systemPrompt = `당신은 시나리오/드라마 작가를 돕는 따뜻한 보조작가 'Genie(제니)'입니다.
+      systemPrompt = `${basePersona}
       사용자의 창작 활동에 영감을 주고, 창작의 고통에 깊이 공감하며 응원과 정서적 지지를 제공하세요.`;
       break;
   }
   
-  const formattedMessages = [
-    { role: 'user', content: systemPrompt },
-    { role: 'model', content: '네, 저는 작가님을 돕는 보조작가 제니입니다. 오늘 어떤 설정이나 대본 분석을 도와드릴까요?' },
-    ...messages,
-  ];
+  // 4. Gemini startChat() 멀티턴 대화
+  const model = genAI.getGenerativeModel({ 
+    model: targetModelName,
+    systemInstruction: systemPrompt,
+  });
 
-  // 4. 최종 답변 스트리밍 모델 연결
-  // gemini-2.5-pro 가 사용 불가능할 경우를 대비하여 try-catch 로 flash 로 롤백 시킬 수도 있으나, 우선 명세대로 설정
-  const model = genAI.getGenerativeModel({ model: targetModelName });
-  const prompt = formattedMessages.map((m: any) => m.content).join('\n');
-  
-  const response = await model.generateContentStream(prompt);
+  const chatHistory = messages.slice(0, -1).map((m: any) => ({
+    role: m.role === 'user' ? 'user' : 'model',
+    parts: [{ text: m.content }],
+  }));
+
+  const chat = model.startChat({ history: chatHistory });
+
+  const response = await chat.sendMessageStream(lastUserMessage);
   const stream = GoogleGenerativeAIStream(response);
 
   return new StreamingTextResponse(stream);

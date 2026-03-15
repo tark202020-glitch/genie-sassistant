@@ -1,5 +1,185 @@
 # Genie Assistant Changelog
 
+## [Alpha V1.019] - 2026-03-16 00:56:00
+
+### 🔄 Build Update
+- **Summary**: 대본/자료 분석 시 전체 텍스트 사용으로 전환 (RAG 부분 검색 → Full-Text)
+- **Detail** :
+  - 🔴 `chat/route.ts`: `analyze_script` — RAG 20개 청크 검색 → `getFullDocumentText()`로 대본 전체 텍스트 복원
+  - 🔴 `chat/route.ts`: `analyze_reference` — RAG 15개 청크 검색 → 참고자료 전체 텍스트 복원
+  - ✅ 대본 분석 시 "처음부터 끝까지 꼼꼼히 읽고 분석" 프롬프트 지시 추가
+  - ✅ 대본이 없는 경우 기존 RAG 폴백 유지
+  - ✅ Gemini 2.5 Flash 1M 토큰 컨텍스트 활용
+  - 🐛 기존 문제: RAG가 대본 앞쪽 몇 페이지(~20청크)만 검색해서 AI가 일부만 보고 답변
+- **Build Time**: 2026-03-16 00:56:00
+
+## [Alpha V1.018] - 2026-03-16 00:00:00
+
+### 🔄 Build Update
+- **Summary**: 캐릭터 관계도 전용 페이지 구현 (`/character-graph`)
+- **Detail** :
+  - ✅ `api/character-graph/route.ts` [NEW]: 선택된 보조작가의 대본에서 Gemini AI로 캐릭터/관계 자동 추출 API
+  - ✅ `character-graph/page.tsx` [NEW]: Canvas force-directed 네트워크 그래프로 캐릭터 관계 시각화
+  - ✅ 캐릭터 역할별 색상/아이콘 (주인공⭐, 조연👤, 적대자🔥, 조력자🤝)
+  - ✅ 관계 유형별 색상 (가족🟢, 연인🩷, 적대🔴, 동료🔵)
+  - ✅ 화별 최신 버전 자동 필터링 (V4.8/V4.9 → V4.9만 선택)
+  - ✅ 노드 드래그, 줌/팬, 호버 상세 정보 인터랙션
+  - ✅ `page.tsx`: 보조작가 상세에 "🎭 캐릭터 관계도 보기" 링크 버튼 추가
+  - ✅ `assistantId` 쿼리 파라미터로 동적 처리 (모든 보조작가 지원)
+- **Build Time**: 2026-03-16 00:00:00
+
+## [Alpha V1.017] - 2026-03-15 20:57:00
+
+### 🔄 Build Update
+- **Summary**: 블랙위도우 비교 파일 선택 버그 수정 — 보조작가 문서 우선 선택
+- **Detail** :
+  - ✅ `chat/route.ts`: `listUploadedDocuments()` 반환값을 `{ assistantFiles, sharedFiles }` 구조로 변경하여 보조작가/공유 문서 구분
+  - ✅ 인텐트 라우터 프롬프트에 `[보조작가 전용 문서]` / `[공유 문서]` 구분 표시 및 보조작가 문서 우선 선택 지시 추가
+  - ✅ `compare_scripts` 폴백 로직에서 보조작가 문서가 2개 이상일 때 보조작가 문서만 우선 사용
+  - 🐛 기존 문제: 보조작가 활성화 상태에서 비교 요청 시 공유 학습자료(미드포인트구조이론.pdf 등)가 잘못 선택됨
+- **Build Time**: 2026-03-15 20:57:00
+
+## [Alpha V1.016] - 2026-03-15 17:18:00
+
+### 🔄 Build Update
+- **Summary**: 대본 비교(compare_scripts) 기능 구현 + RAG 임베딩 안정화
+- **Detail** :
+  - ✅ `chat/route.ts`: `compare_scripts` 인텐트 추가 (6종 인텐트 라우팅)
+  - ✅ `getFullDocumentText()` 함수: pgvector에서 전체 청크를 순서대로 복원하여 Full-Text 비교
+  - ✅ `listUploadedDocuments()` 함수: 업로드된 문서 목록을 인텐트 라우터에 제공
+  - ✅ 대본 비교 시스템 프롬프트: S# 단위 비교, 대사/지문/구조 변경 탐지, 작가 의도 추론
+  - ✅ `embeddings.ts`: 임베딩 모델 `gemini-embedding-001`로 변경 (text-embedding-004 종료 대응)
+  - ✅ Rate Limit 429 재시도 로직 (최대 3회, 5~10초 대기) + 요청 간 1초 지연
+  - ✅ `maxDuration` 60초 → 300초 확장 (대용량 파일/대본 비교 처리)
+  - ✅ RAG 검색량 차등 적용: 대본분석 20개, 자료분석 15개, 일반검색 10개 청크
+  - ✅ 유사도 임계값 0.3 → 0.2로 완화
+- **Build Time**: 2026-03-15 17:18:00
+
+## [Alpha V1.015] - 2026-03-15 15:15:00
+
+### 🔄 Build Update
+- **Summary**: Vector RAG 업그레이드 (Discovery Engine → Supabase pgvector) + 지식 그래프 시각화
+- **Detail** :
+  - 🔴 RAG 아키텍처 전면 전환: Google Vertex AI Search (Discovery Engine) → Supabase pgvector 기반 Vector RAG
+  - ✅ `src/lib/embeddings.ts` [NEW]: Google `text-embedding-004` 임베딩 생성, LangChain 텍스트 청킹, PDF/TXT 텍스트 추출 유틸리티
+  - ✅ `src/types/pdf-parse.d.ts` [NEW]: pdf-parse TypeScript 타입 선언
+  - ✅ `api/ingest/route.ts`: 파일→텍스트 추출→청킹→임베딩→pgvector 저장 파이프라인으로 전환
+  - ✅ `api/assistants/[id]/ingest/route.ts`: 레벨2 전용 Vector RAG 파이프라인 (assistant_id, doc_type 구분)
+  - ✅ `api/chat/route.ts`: SearchServiceClient → Supabase `match_documents` RPC 코사인 유사도 검색으로 전환
+  - ✅ `api/documents/route.ts`: Discovery Engine listDocuments → pgvector 테이블 쿼리로 전환
+  - ✅ `api/assistants/[id]/documents/route.ts`: 레벨2 문서 목록 pgvector 전환
+  - ✅ `api/knowledge-graph/route.ts` [NEW]: 문서 간 코사인 유사도 계산 + 보조작가/문서 노드 그래프 데이터 API
+  - ✅ `knowledge-graph/page.tsx` [NEW]: Canvas 기반 force-directed 네트워크 그래프 시각화 (줌/팬/드래그/유사도 필터)
+  - ✅ `@google-cloud/discoveryengine` 패키지 제거 (79개 패키지 삭제)
+  - ✅ `doc/supabase_migration_vector.sql` [NEW]: pgvector 마이그레이션 SQL 스크립트
+  - ⚠️ Supabase SQL Editor에서 `supabase_migration_vector.sql` 수동 실행 필요
+- **Build Time**: 2026-03-15 15:15:00
+
+## [Alpha V1.014] - 2026-03-15 11:26:00
+
+### 🔄 Build Update
+- **Summary**: 다중 파일 업로드 기능 구현 — 공유 학습자료 + 보조작가 전용 자료
+- **Detail** :
+  - ✅ `page.tsx`: `<input type="file">` 에 `multiple` 속성 추가, 파일 상태를 `File | null` → `File[]` 배열로 변경
+  - ✅ 공유 학습자료(레벨1) 다중 파일 순차 업로드 로직 구현 (기존 API 그대로 활용)
+  - ✅ 보조작가 전용 자료(레벨2) 다중 파일 순차 업로드 로직 구현
+  - ✅ 선택된 파일 개수 & 파일명 목록 표시 UI 추가
+  - ✅ 업로드 진행률 표시 (예: "(2/5) example.txt GCS에 업로드 중...")
+  - ✅ 전체 완료 시 성공/실패 요약 메시지 표시
+  - ✅ 백엔드 API 변경 없음 — 프론트엔드 순차 호출 방식
+- **Build Time**: 2026-03-15 11:26:00
+
+## [Alpha V1.013] - 2026-03-15 01:40:00
+
+### 🔄 Build Update
+- **Summary**: 보조작가 업로드 로직 개선 — 대본/자료 분리 시스템
+- **Detail** :
+  - ✅ `page.tsx`: 업로드 UI에 📜대본/📚자료 선택 탭 추가, 문서 목록 대본/자료 섹션 구분 표시
+  - ✅ `assistants/[id]/ingest/route.ts`: docType별 GCS 하위 폴더 분리 (scripts/, references/)
+  - ✅ `assistants/[id]/documents/route.ts`: docType 필드 반환 (GCS 경로에서 자동 감지)
+  - ✅ `chat/route.ts`: 인텐트 라우터 5가지로 확장 (conversation/search/analyze_script/analyze_reference/analyze)
+  - ✅ 대본 분석 시 서사구조/캐릭터 아크 특화 프롬프트, 자료 분석 시 정보 추출/요약 특화 프롬프트
+  - ✅ 기존 루트 폴더 파일(블랙위도우 1~4부 대본)은 자동으로 'script' 분류
+- **Build Time**: 2026-03-15 01:40:00
+
+
+## [Alpha V1.012] - 2026-03-15 01:12:00
+
+### 🔄 Build Update
+- **Summary**: 답변 UI 개선 — 블랙위도우 보조작가 이름 + 마크다운 렌더링 적용
+- **Detail** :
+  - ✅ `react-markdown` + `remark-gfm` 패키지 설치
+  - ✅ `page.tsx`: 답변자 이름 'Genie 보조작가' → '블랙위도우 보조작가'로 변경, AI 응답을 `ReactMarkdown` 컴포넌트로 렌더링
+  - ✅ `chat/route.ts`: 기본 assistantName을 '블랙위도우'로 변경, 시스템 프롬프트에 마크다운 형식 답변 지시 추가
+  - ✅ `globals.css`: 마크다운 렌더링 전용 CSS 스타일 추가 (제목, 목록, 코드블록, 테이블, 인용문, 구분선 등 프리미엄 다크 디자인)
+- **Build Time**: 2026-03-15 01:12:00
+
+
+## [Alpha V1.011] - 2026-03-14 11:15:00
+
+### 🔄 Build Update
+- **Summary**: 지식레벨2 보조작가 시스템 구현
+- **Detail** :
+  - ✅ Supabase `assistants` 테이블 생성 (name, specialty, persona, data_store_id)
+  - ✅ `/api/assistants` — 보조작가 CRUD + Discovery Engine 데이터 스토어 자동 생성/삭제
+  - ✅ `/api/assistants/[id]/ingest` — 보조작가 전용 GCS 폴더 업로드 + Import
+  - ✅ `/api/assistants/[id]/documents` — 보조작가 전용 문서 목록/삭제
+  - ✅ `chat/route.ts` — 레벨1(공유) + 레벨2(보조작가 전용) 결합 검색, 보조작가 페르소나 반영
+  - ✅ `page.tsx` — 2탭 사이드바 (📚 공유 학습자료 / 🤖 보조작가 관리)
+  - ✅ 채팅 헤더에 활성 보조작가 표시 + 해제 기능
+- **Build Time**: 2026-03-14 11:15:00
+
+## [Alpha V1.010] - 2026-03-13 19:14:00
+
+### 🔄 Build Update
+- **Summary**: 좌측 사이드바 UI 전면 개편 + RAG 검색 버그 수정
+- **Detail** :
+  - 🔴 `page.tsx` 전면 재작성: 2-panel 레이아웃(좌측 사이드바 + 우측 채팅)으로 전환
+  - ✅ "작가학습자료" 좌측 사이드바: 문서 목록, 파일 업로드, 삭제 기능 통합
+  - ✅ 업로드 시 3단계 프로그레스 표시(GCS 업로드 → AI 인덱싱 → 완료)
+  - ✅ 삭제 시 단계별 로딩 표시(GCS 삭제 → 인덱스 제거 → 완료)
+  - ✅ "학습하기" 버튼 그라데이션(blue→purple) 스타일로 눈에 띄게 변경
+  - 🔧 `chat/route.ts`: chunking config 데이터 스토어와 호환 안되는 `extractiveContentSpec` 제거, `searchResultMode: 'CHUNKS'` 추가
+  - 🔧 인텐트 라우터: 문서 질문도 "search"로 분류하도록 프롬프트 확장
+- **Build Time**: 2026-03-13 19:14:00
+
+## [Alpha V1.009] - 2026-03-13 18:43:00
+
+### 🔄 Build Update
+- **Summary**: RAG 아키텍처 전면 전환 — Supabase pgvector → Vertex AI AI Applications (Discovery Engine)
+- **Detail** :
+  - 🔴 `chat/route.ts`: Supabase 유사도 검색 + Gemini Embedding → Vertex AI Search API (`SearchServiceClient`) 기반 문서 검색으로 전면 교체
+  - 🔴 `ingest/route.ts`: PDF 파싱+임베딩 → GCS 업로드 + Discovery Engine `importDocuments()` API로 데이터 스토어 자동 등록
+  - 🔴 `documents/route.ts`: Supabase 문서 목록 → Discovery Engine `DocumentServiceClient` + GCS 폴백으로 변경
+  - 🟡 `page.tsx`: 문서 목록 UI를 청크 기반 → 인덱싱 상태 기반으로 변경, Import 실패 시 경고 메시지 표시
+  - ✅ `@google-cloud/discoveryengine`, `@google-cloud/storage` 패키지 추가
+  - ✅ GCP 서비스 계정 인증 및 환경 변수 설정 (프로젝트: `rag-bighistory`)
+- **Build Time**: 2026-03-13 18:43:00
+
+## [Alpha V1.008] - 2026-03-13 01:08:20
+
+### 🔄 Build Update
+- **Summary**: 학습 완료 문서 목록 조회/삭제 기능 및 중복 업로드 방지 구현
+- **Detail** :
+  - 새 API 엔드포인트 `/api/documents` 추가 (GET: 문서 목록, DELETE: 문서 삭제)
+  - 메인 화면에 접이식 "학습된 문서 목록" 패널 추가 (파일명, 청크 수, 삭제 버튼)
+  - 파일 업로드 시 동일 파일명 중복 경고 및 자동 교체(삭제 후 재업로드) 로직 추가
+  - Supabase 벡터 차원 불일치 발견 (768 vs 3072) — 테이블 스키마 변경 필요
+- **Build Time**: 2026-03-13 01:08:20
+
+## [Alpha V1.007] - 2026-03-13 00:58:31
+
+### 🔄 Build Update
+- **Summary**: RAG 아키텍처 전반 시스템 점검 및 4대 핵심 이슈 수정
+- **Detail** :
+  - 🔴 임베딩 모델 교체: `text-embedding-004` (2026-01-14 종료) → `gemini-embedding-001` (Google 공식 후속 모델)
+  - 🔴 Edge Runtime 제거: `chat/route.ts`에서 `export const runtime = 'edge'` 삭제 (LangChain Node.js 전용 호환성 문제 해결)
+  - 🟡 배치 임베딩 구현: `ingest/route.ts`에서 순차 `embedQuery()` → `embedDocuments()` 배치 처리로 성능 대폭 향상
+  - 🟡 멀티턴 대화 개선: `chat/route.ts`에서 `join('\n')` 단순 합산 → Gemini `startChat()` + `systemInstruction` 기반 올바른 역할 구분
+  - 파일 업로드 용량 제한 해제: `next.config.mjs`에 `bodySizeLimit: "20mb"` 설정 추가
+  - Google API 키 유출 감지 → 새 API 키로 교체
+- **Build Time**: 2026-03-13 00:58:31
+
 ## [Alpha V1.006] - 2026-03-11 21:51:00
 
 ### 🔄 Build Update

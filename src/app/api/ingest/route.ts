@@ -1,22 +1,22 @@
 import { NextResponse } from 'next/server';
-import { GoogleGenerativeAIEmbeddings } from '@langchain/google-genai';
-import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
+import { Storage } from '@google-cloud/storage';
 import { createClient } from '@supabase/supabase-js';
+import { generateEmbeddings, splitTextIntoChunks, extractTextFromBuffer } from '@/lib/embeddings';
 
-const pdfParse = require('pdf-parse');
+export const maxDuration = 300; // 대용량 파일 처리를 위해 5분으로 확장
 
-export const maxDuration = 60; // Allow more time for parsing and embedding
-
-// Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
-
-// Initialize Google Gemini Embeddings Model
-const embeddings = new GoogleGenerativeAIEmbeddings({
-  apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
-  modelName: 'text-embedding-004',
+// GCS 클라이언트
+const storage = new Storage({
+  keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+  projectId: process.env.GCP_PROJECT_ID,
 });
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+);
+
+const BUCKET_NAME = process.env.GCS_BUCKET_NAME || 'story_ai_helper';
 
 export async function POST(req: Request) {
   try {
@@ -29,56 +29,83 @@ export async function POST(req: Request) {
 
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
+    const fileName = file.name;
 
-    let text = '';
-    
-    // Parse PDF or Text based on extension
-    if (file.name.toLowerCase().endsWith('.pdf')) {
-      const pdfData = await pdfParse(buffer);
-      text = pdfData.text;
-    } else {
-      text = buffer.toString('utf-8');
-    }
+    // GCS 경로 결정 (database 폴더에 저장 — 원본 보관용)
+    const gcsPath = `database/${fileName}`;
+    const gcsUri = `gs://${BUCKET_NAME}/${gcsPath}`;
 
-    if (!text.trim()) {
-      return NextResponse.json({ error: '추출된 텍스트가 없습니다.' }, { status: 400 });
-    }
+    console.log(`[Ingest] GCS 업로드 시작: ${gcsUri}`);
 
-    console.log(`[Ingest] 문서 파싱 완료. 추출된 텍스트 길이: ${text.length}`);
+    // 1단계: GCS에 파일 업로드 (원본 보관)
+    const bucket = storage.bucket(BUCKET_NAME);
+    const gcsFile = bucket.file(gcsPath);
 
-    // Split text into chunk documents
-    const splitter = new RecursiveCharacterTextSplitter({
-      chunkSize: 1000,
-      chunkOverlap: 200,
+    await gcsFile.save(buffer, {
+      metadata: {
+        contentType: file.type || 'application/octet-stream',
+      },
     });
-    
-    const docs = await splitter.createDocuments([text]);
-    console.log(`[Ingest] 총 ${docs.length}개의 청크로 분할 완료.`);
 
-    // Generate embeddings for each chunk and prepare for Supabase
-    const vectors = [];
-    for (const doc of docs) {
-      const embedding = await embeddings.embedQuery(doc.pageContent);
-      vectors.push({
-        content: doc.pageContent,
-        metadata: { source: file.name, ...doc.metadata },
-        embedding,
+    console.log(`[Ingest] GCS 업로드 완료: ${gcsUri}`);
+
+    // 2단계: 텍스트 추출
+    console.log(`[Ingest] 텍스트 추출 시작...`);
+    const text = await extractTextFromBuffer(buffer, fileName);
+    console.log(`[Ingest] 텍스트 추출 완료: ${text.length}자`);
+
+    if (!text || text.trim().length === 0) {
+      return NextResponse.json({
+        success: true,
+        warning: 'GCS 업로드는 성공했지만, 파일에서 텍스트를 추출할 수 없습니다.',
+        gcsUri,
       });
     }
 
-    // Insert vectors to 'documents' table of Supabase
-    const { error } = await supabase.from('documents').insert(vectors);
+    // 3단계: 텍스트 청킹
+    console.log(`[Ingest] 텍스트 청킹 시작...`);
+    const chunks = await splitTextIntoChunks(text);
+    console.log(`[Ingest] 청킹 완료: ${chunks.length}개 청크`);
 
-    if (error) {
-       console.error('[Ingest Error] Supabase 저장 실패:', error);
-       return NextResponse.json({ error: '데이터베이스 저장에 실패했습니다.' }, { status: 500 });
+    // 4단계: 임베딩 생성
+    console.log(`[Ingest] 임베딩 생성 시작... (${chunks.length}개)`);
+    const embeddings = await generateEmbeddings(chunks);
+    console.log(`[Ingest] 임베딩 생성 완료`);
+
+    // 5단계: Supabase pgvector에 저장
+    console.log(`[Ingest] pgvector 저장 시작...`);
+    const rows = chunks.map((chunk, i) => ({
+      content: chunk,
+      metadata: { fileName, chunkIndex: i, totalChunks: chunks.length },
+      embedding: JSON.stringify(embeddings[i]),
+      assistant_id: null, // 레벨1 (공유 지식)
+      doc_type: 'script',
+      source_file: fileName,
+      gcs_uri: gcsUri,
+    }));
+
+    // 배치 삽입 (500개씩)
+    const batchSize = 500;
+    for (let i = 0; i < rows.length; i += batchSize) {
+      const batch = rows.slice(i, i + batchSize);
+      const { error: insertErr } = await supabase.from('documents').insert(batch);
+      if (insertErr) {
+        console.error(`[Ingest] pgvector 저장 실패 (배치 ${i}):`, insertErr.message);
+        throw new Error(`벡터 저장 실패: ${insertErr.message}`);
+      }
     }
 
-    console.log(`[Ingest] ${vectors.length}개 청크의 DB 저장을 성공적으로 완료했습니다.`);
-    return NextResponse.json({ success: true, chunks: vectors.length, message: '업로드 완료' });
-    
+    console.log(`[Ingest] pgvector 저장 완료: ${rows.length}개 벡터`);
+
+    return NextResponse.json({
+      success: true,
+      message: `"${fileName}" 업로드 및 벡터 인덱싱 완료. ${chunks.length}개 청크가 저장되었습니다.`,
+      gcsUri,
+      chunksCount: chunks.length,
+    });
+
   } catch (err: any) {
     console.error('[Ingest Exception]', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: `업로드 실패: ${err.message}` }, { status: 500 });
   }
 }

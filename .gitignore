@@ -26,6 +26,10 @@ yarn-error.log*
 # local env files
 .env*.local
 
+# GCP credentials
+gcp-service-account.json
+*.json.key
+
 # vercel
 .vercel
 

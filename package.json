@@ -11,6 +11,8 @@
   "dependencies": {
     "@ai-sdk/google": "^3.0.43",
     "@ai-sdk/react": "^0.0.9",
+
+    "@google-cloud/storage": "^7.19.0",
     "@google/generative-ai": "^0.24.1",
     "@langchain/core": "^1.1.31",
     "@langchain/google-genai": "^2.1.24",
@@ -28,6 +30,8 @@
     "pdf-parse": "^1.1.1",
     "react": "19.0.0",
     "react-dom": "19.0.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "tailwind-merge": "^3.5.0",
     "tailwindcss-animate": "^1.0.7",
     "zod": "^3.25.76"
