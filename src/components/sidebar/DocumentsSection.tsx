@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { UploadProgress } from '@/components/shared/UploadProgress';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { DocSummaryModal } from '@/components/shared/DocSummaryModal';
 import type { useDocuments } from '@/hooks/use-documents';
 import type { useAssistants } from '@/hooks/use-assistants';
 import type { LearnedDocument } from '@/types';
@@ -21,6 +22,7 @@ export function DocumentsSection({ documents, assistantsHook }: DocumentsSection
   const [showAll, setShowAll] = useState(false);
   const [confirmDoc, setConfirmDoc] = useState<LearnedDocument | null>(null);
   const [confirmSource, setConfirmSource] = useState<'shared' | 'assistant'>('shared');
+  const [summaryDoc, setSummaryDoc] = useState<LearnedDocument | null>(null);
 
   const activeAssistant = assistantsHook.activeAssistant;
   const assistantDocs = assistantsHook.assistantDocs;
@@ -80,6 +82,7 @@ export function DocumentsSection({ documents, assistantsHook }: DocumentsSection
                   setConfirmDoc(doc);
                   setConfirmSource('assistant');
                 }}
+                onDocClick={setSummaryDoc}
               />
             ) : (
               <SharedDocContent
@@ -89,6 +92,7 @@ export function DocumentsSection({ documents, assistantsHook }: DocumentsSection
                   setConfirmDoc(doc);
                   setConfirmSource('shared');
                 }}
+                onDocClick={setSummaryDoc}
               />
             )}
           </div>
@@ -132,6 +136,13 @@ export function DocumentsSection({ documents, assistantsHook }: DocumentsSection
         confirmLabel="삭제"
         variant="destructive"
       />
+
+      <DocSummaryModal
+        doc={summaryDoc}
+        assistantId={activeAssistant?.id}
+        open={!!summaryDoc}
+        onClose={() => setSummaryDoc(null)}
+      />
     </div>
   );
 }
@@ -140,10 +151,12 @@ function SharedDocContent({
   documents,
   showAll,
   onDeleteRequest,
+  onDocClick,
 }: {
   documents: ReturnType<typeof useDocuments>;
   showAll: boolean;
   onDeleteRequest: (doc: LearnedDocument) => void;
+  onDocClick: (doc: LearnedDocument) => void;
 }) {
   return (
     <div className={`${showAll ? 'max-h-[50vh]' : 'max-h-80'} flex flex-col transition-all duration-300`}>
@@ -195,6 +208,7 @@ function SharedDocContent({
                 doc={doc}
                 icon={FileText}
                 onDelete={() => onDeleteRequest(doc)}
+                onClick={() => onDocClick(doc)}
               />
             ))}
           </div>
@@ -208,10 +222,12 @@ function AssistantDocContent({
   assistantsHook,
   showAll,
   onDeleteRequest,
+  onDocClick,
 }: {
   assistantsHook: ReturnType<typeof useAssistants>;
   showAll: boolean;
   onDeleteRequest: (doc: LearnedDocument) => void;
+  onDocClick: (doc: LearnedDocument) => void;
 }) {
   const scripts = assistantsHook.assistantDocs.filter((d) => d.docType !== 'reference');
   const references = assistantsHook.assistantDocs.filter((d) => d.docType === 'reference');
@@ -291,7 +307,7 @@ function AssistantDocContent({
               </div>
             )}
             {scripts.map((doc) => (
-              <DocItem key={doc.id || doc.source} doc={doc} icon={Scroll} onDelete={() => onDeleteRequest(doc)} />
+              <DocItem key={doc.id || doc.source} doc={doc} icon={Scroll} onDelete={() => onDeleteRequest(doc)} onClick={() => onDocClick(doc)} />
             ))}
             {references.length > 0 && (
               <div className="px-3 py-1 bg-muted/30 sticky top-0 z-10">
@@ -301,7 +317,7 @@ function AssistantDocContent({
               </div>
             )}
             {references.map((doc) => (
-              <DocItem key={doc.id || doc.source} doc={doc} icon={BookOpen} onDelete={() => onDeleteRequest(doc)} />
+              <DocItem key={doc.id || doc.source} doc={doc} icon={BookOpen} onDelete={() => onDeleteRequest(doc)} onClick={() => onDocClick(doc)} />
             ))}
           </div>
         )}
@@ -314,21 +330,27 @@ function DocItem({
   doc,
   icon: Icon,
   onDelete,
+  onClick,
 }: {
   doc: LearnedDocument;
   icon: React.ComponentType<{ className?: string }>;
   onDelete: () => void;
+  onClick: () => void;
 }) {
   return (
     <div className="px-3 py-1.5 hover:bg-muted/50 group flex items-center justify-between gap-2">
-      <div className="flex-1 min-w-0">
-        <p className="text-sm text-foreground truncate flex items-center gap-1.5">
+      <button
+        onClick={onClick}
+        className="flex-1 min-w-0 text-left"
+        title="클릭하여 요약 보기"
+      >
+        <p className="text-sm text-foreground truncate flex items-center gap-1.5 group-hover:text-primary transition-colors">
           <Icon className="w-3.5 h-3.5 shrink-0" />
           {doc.source}
         </p>
-      </div>
+      </button>
       <button
-        onClick={onDelete}
+        onClick={(e) => { e.stopPropagation(); onDelete(); }}
         className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive hover:bg-destructive/10 p-1 rounded transition-all"
       >
         <Trash2 className="w-3.5 h-3.5" />

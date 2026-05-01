@@ -75,9 +75,35 @@ BEGIN
 END;
 $$;
 
+-- 6. 문서 요약 테이블 (파일 업로드 시 자동 생성)
+CREATE TABLE IF NOT EXISTS document_summaries (
+  id BIGSERIAL PRIMARY KEY,
+  source_file TEXT NOT NULL,
+  assistant_id UUID REFERENCES assistants(id) ON DELETE CASCADE,
+  summary TEXT NOT NULL,
+  doc_type TEXT DEFAULT 'script',
+  gcs_uri TEXT,
+  char_count INT DEFAULT 0,
+  chunk_count INT DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- assistant_id가 NULL인 경우를 위한 고유 인덱스 (공유 자료)
+CREATE UNIQUE INDEX IF NOT EXISTS document_summaries_source_file_null_assistant
+  ON document_summaries (source_file) WHERE assistant_id IS NULL;
+
+-- assistant_id가 있는 경우의 고유 인덱스 (보조작가 전용)
+CREATE UNIQUE INDEX IF NOT EXISTS document_summaries_source_file_assistant
+  ON document_summaries (source_file, assistant_id) WHERE assistant_id IS NOT NULL;
+
 -- ============================================
 -- ★ 기존 DB 업데이트 시 아래 SQL만 실행하세요
 -- Supabase 대시보드 > SQL Editor에서 실행
 -- ============================================
+-- 1) match_documents RPC 업데이트:
 -- DROP FUNCTION IF EXISTS match_documents;
 -- 위의 CREATE OR REPLACE FUNCTION match_documents(...) 전체를 실행
+--
+-- 2) document_summaries 테이블 생성:
+-- 위의 CREATE TABLE IF NOT EXISTS document_summaries(...) 및 인덱스 전체를 실행

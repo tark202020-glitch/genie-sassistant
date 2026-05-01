@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { generateEmbeddings, splitTextIntoChunks, extractTextFromBuffer } from '@/lib/embeddings';
+import { generateEmbeddings, splitTextIntoChunks, extractTextFromBuffer, generateDocumentSummary } from '@/lib/embeddings';
 import { storage, BUCKET_NAME } from '@/lib/gcs';
 
 const supabase = createClient(
@@ -109,6 +109,35 @@ export async function POST(
     }
 
     console.log(`[Assistant Ingest] pgvector 저장 완료: ${rows.length}개 벡터`);
+
+    // 6단계: 문서 요약 생성 및 저장
+    console.log(`[Assistant Ingest] 문서 요약 생성 시작...`);
+    const summary = await generateDocumentSummary(text, fileName);
+    console.log(`[Assistant Ingest] 문서 요약 생성 완료: ${summary.length}자`);
+
+    // 기존 요약이 있으면 업데이트, 없으면 삽입
+    const { data: existingSummary } = await supabase
+      .from('document_summaries')
+      .select('id')
+      .eq('source_file', fileName)
+      .eq('assistant_id', id)
+      .maybeSingle();
+
+    if (existingSummary) {
+      await supabase.from('document_summaries')
+        .update({ summary, doc_type: docType, char_count: text.length, chunk_count: chunks.length, updated_at: new Date().toISOString() })
+        .eq('id', existingSummary.id);
+    } else {
+      await supabase.from('document_summaries').insert({
+        source_file: fileName,
+        assistant_id: id,
+        summary,
+        doc_type: docType,
+        gcs_uri: gcsUri,
+        char_count: text.length,
+        chunk_count: chunks.length,
+      });
+    }
 
     const typeLabel = docType === 'reference' ? '참고자료' : '대본';
     return NextResponse.json({

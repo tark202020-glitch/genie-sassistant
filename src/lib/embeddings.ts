@@ -96,6 +96,58 @@ export async function splitTextIntoChunks(
 }
 
 /**
+ * 문서 전체 텍스트에서 핵심 요약 생성 (Gemini Flash)
+ * - 업로드 시 1회만 호출, 결과를 DB에 저장
+ */
+export async function generateDocumentSummary(
+  text: string,
+  fileName: string
+): Promise<string> {
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-preview-05-20' });
+
+  // 텍스트가 너무 길면 앞뒤를 샘플링
+  const MAX_INPUT = 30000;
+  let inputText = text;
+  if (text.length > MAX_INPUT) {
+    const head = text.slice(0, MAX_INPUT * 0.7);
+    const tail = text.slice(-MAX_INPUT * 0.3);
+    inputText = head + '\n\n[... 중략 ...]\n\n' + tail;
+  }
+
+  const prompt = `다음은 "${fileName}" 문서의 내용입니다.
+
+이 문서의 핵심 내용을 한국어로 요약해주세요.
+
+요약 형식:
+1. **문서 개요** (1~2문장): 이 문서가 무엇에 관한 것인지
+2. **핵심 내용** (3~5개 불릿): 가장 중요한 포인트들
+3. **주요 키워드**: 쉼표로 구분
+
+간결하고 정보 밀도 높게 작성하세요.
+
+---
+${inputText}`;
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const result = await model.generateContent(prompt);
+      const response = result.response;
+      return response.text();
+    } catch (err: any) {
+      if (err.status === 429 && attempt < 2) {
+        const waitTime = (attempt + 1) * 5000;
+        console.log(`[Summary] Rate Limit — ${waitTime / 1000}초 대기 후 재시도...`);
+        await sleep(waitTime);
+      } else {
+        console.error('[Summary] 요약 생성 실패:', err.message);
+        return '요약 생성에 실패했습니다.';
+      }
+    }
+  }
+  return '요약 생성에 실패했습니다.';
+}
+
+/**
  * 파일 Buffer에서 텍스트 추출
  * - PDF: pdf-parse 사용
  * - TXT/기타: UTF-8 디코딩
