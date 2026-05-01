@@ -16,6 +16,8 @@
     "@langchain/core": "^1.1.31",
     "@langchain/google-genai": "^2.1.24",
     "@langchain/textsplitters": "^1.0.1",
+    "@nivo/chord": "^0.99.0",
+    "@nivo/core": "^0.99.0",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-dropdown-menu": "^2.1.16",

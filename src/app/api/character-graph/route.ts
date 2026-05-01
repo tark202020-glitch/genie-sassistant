@@ -175,11 +175,60 @@ export async function GET(req: Request) {
       color: RELATION_COLORS[r.type] || RELATION_COLORS['기타'],
     }));
 
+    // Chord 다이어그램용 매트릭스 생성 (N x N, 씬 교차 기반 관계량)
+    const charNames = nodes.map((n: any) => n.label);
+    const n = charNames.length;
+    const chordMatrix: number[][] = Array.from({ length: n }, () => Array(n).fill(0));
+
+    for (const r of extracted.relationships || []) {
+      const i = charNames.indexOf(r.from);
+      const j = charNames.indexOf(r.to);
+      if (i >= 0 && j >= 0) {
+        const val = (r.weight || 1) * 5; // weight → 관계량 스케일링
+        chordMatrix[i][j] = val;
+        chordMatrix[j][i] = val; // 대칭
+      }
+    }
+
+    // AI 인사이트 생성
+    let insights: string[] = [];
+    try {
+      const insightPrompt = `
+다음은 드라마 캐릭터 관계 분석 결과입니다. 작가에게 유용한 인사이트를 3~5개 제공해주세요.
+
+캐릭터: ${charNames.join(', ')}
+관계:
+${(extracted.relationships || []).map((r: any) => `- ${r.from} ↔ ${r.to}: ${r.type} (강도 ${r.weight}/5) - ${r.description}`).join('\n')}
+
+규칙:
+1. 각 인사이트는 1~2문장으로 간결하게
+2. 구조적 특이점, 고립된 인물, 관계 밀집도 등을 분석
+3. 작가에게 스토리 개선 힌트가 되는 내용
+4. 한국어로 작성
+
+응답 형식 (JSON):
+{ "insights": ["인사이트1", "인사이트2", ...] }`;
+
+      const insightResult = await model.generateContent(insightPrompt);
+      const insightParsed = JSON.parse(insightResult.response.text());
+      insights = insightParsed.insights || [];
+    } catch (e) {
+      console.error('[CharGraph] 인사이트 생성 실패:', e);
+      insights = [];
+    }
+
     return NextResponse.json({
       assistant: { name: assistant.name, specialty: assistant.specialty },
       scripts: scriptTexts.map(s => ({ episode: s.episode, fileName: s.fileName, length: s.text.length })),
       nodes,
       edges,
+      chord: {
+        keys: charNames,
+        matrix: chordMatrix,
+        roles: nodes.map((n: any) => n.role),
+        colors: nodes.map((n: any) => n.color),
+      },
+      insights,
       stats: {
         totalCharacters: nodes.length,
         totalRelationships: edges.length,

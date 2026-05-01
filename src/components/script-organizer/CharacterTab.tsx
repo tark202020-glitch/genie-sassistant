@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Loader2, RefreshCw, Users, ExternalLink } from 'lucide-react';
+import { Loader2, RefreshCw, Users, ExternalLink, Network, Circle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { CharacterChordDiagram } from './CharacterChordDiagram';
 
 interface CharNode {
   id: string;
@@ -29,13 +30,24 @@ interface CharEdge {
   color: string;
 }
 
+interface ChordData {
+  keys: string[];
+  matrix: number[][];
+  roles: string[];
+  colors: string[];
+}
+
 interface CharGraphData {
   assistant: { name: string; specialty: string };
   scripts: { episode: string; fileName: string; length: number }[];
   nodes: CharNode[];
   edges: CharEdge[];
+  chord?: ChordData;
+  insights?: string[];
   stats: { totalCharacters: number; totalRelationships: number; analyzedScripts: number };
 }
+
+type ViewMode = 'canvas' | 'chord';
 
 interface CharacterTabProps {
   assistantId: string;
@@ -47,6 +59,7 @@ export function CharacterTab({ assistantId }: CharacterTabProps) {
   const [error, setError] = useState('');
   const [hoveredNode, setHoveredNode] = useState<CharNode | null>(null);
   const [draggedNode, setDraggedNode] = useState<CharNode | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('canvas');
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const nodesRef = useRef<CharNode[]>([]);
@@ -367,6 +380,33 @@ export function CharacterTab({ assistantId }: CharacterTabProps) {
           <span>분석 대본 <b className="text-amber-400">{graphData.stats.analyzedScripts}</b></span>
         </div>
         <div className="flex items-center gap-2">
+          {/* 뷰 모드 토글 */}
+          <div className="flex items-center bg-white/5 border border-white/10 rounded-lg p-0.5">
+            <button
+              onClick={() => setViewMode('canvas')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                viewMode === 'canvas'
+                  ? 'bg-white/10 text-white'
+                  : 'text-white/40 hover:text-white/60'
+              }`}
+              title="노드 그래프"
+            >
+              <Network className="w-3.5 h-3.5" />
+              그래프
+            </button>
+            <button
+              onClick={() => setViewMode('chord')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                viewMode === 'chord'
+                  ? 'bg-white/10 text-white'
+                  : 'text-white/40 hover:text-white/60'
+              }`}
+              title="코드 다이어그램"
+            >
+              <Circle className="w-3.5 h-3.5" />
+              코드
+            </button>
+          </div>
           <a
             href={`/character-graph?assistantId=${assistantId}`}
             target="_blank"
@@ -388,7 +428,19 @@ export function CharacterTab({ assistantId }: CharacterTabProps) {
           </Button>
         </div>
       </div>
-      <div className="flex-1 relative">
+
+      {/* Chord 뷰 */}
+      {viewMode === 'chord' && graphData.chord && (
+        <div className="flex-1">
+          <CharacterChordDiagram
+            chord={graphData.chord}
+            insights={graphData.insights || []}
+          />
+        </div>
+      )}
+
+      {/* Canvas 뷰 */}
+      <div className={`flex-1 relative ${viewMode === 'chord' ? 'hidden' : ''}`}>
         <canvas
           ref={canvasRef}
           className="w-full h-full"
