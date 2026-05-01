@@ -103,7 +103,7 @@ export async function generateDocumentSummary(
   text: string,
   fileName: string
 ): Promise<string> {
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-preview-05-20' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
   // 텍스트가 너무 길면 앞뒤를 샘플링
   const MAX_INPUT = 30000;

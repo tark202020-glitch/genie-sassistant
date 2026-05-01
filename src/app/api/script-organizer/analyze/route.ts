@@ -78,7 +78,7 @@ export async function POST(req: Request) {
     console.log(`[ScriptOrganizer] ${assistant.name}: ${scripts.length}개 대본, 분석 유형: ${analysisType}`);
 
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash-preview-05-20',
+      model: 'gemini-2.5-flash',
       generationConfig: { responseMimeType: 'application/json' },
     });
 
