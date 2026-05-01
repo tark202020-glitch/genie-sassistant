@@ -1,19 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { Storage } from '@google-cloud/storage';
+import { storage, BUCKET_NAME } from '@/lib/gcs';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 );
-
-const storage = new Storage({
-  keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-  projectId: process.env.GCP_PROJECT_ID,
-});
-
-const BUCKET_NAME = process.env.GCS_BUCKET_NAME || 'story_ai_helper';
-const APP_ID = process.env.APP_ID || 'genie_assistant';
 
 // GET: 보조작가 전용 문서 목록 (대본/자료 구분 포함)
 export async function GET(
@@ -28,7 +20,6 @@ export async function GET(
       .from('assistants')
       .select('*')
       .eq('id', id)
-      .eq('app_id', APP_ID)
       .single();
 
     if (fetchErr || !assistant) {
@@ -40,7 +31,6 @@ export async function GET(
       .from('documents')
       .select('source_file, gcs_uri, doc_type, created_at')
       .eq('assistant_id', id)
-      .eq('app_id', APP_ID)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -125,8 +115,7 @@ export async function DELETE(
         .from('documents')
         .delete({ count: 'exact' })
         .eq('source_file', source)
-        .eq('assistant_id', id)
-        .eq('app_id', APP_ID);
+        .eq('assistant_id', id);
 
       if (deleteErr) {
         console.error('[Assistant Docs] pgvector 삭제 실패:', deleteErr.message);

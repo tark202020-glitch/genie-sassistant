@@ -1,20 +1,12 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { Storage } from '@google-cloud/storage';
 import { generateEmbeddings, splitTextIntoChunks, extractTextFromBuffer } from '@/lib/embeddings';
+import { storage, BUCKET_NAME } from '@/lib/gcs';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 );
-
-const storage = new Storage({
-  keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-  projectId: process.env.GCP_PROJECT_ID,
-});
-
-const BUCKET_NAME = process.env.GCS_BUCKET_NAME || 'story_ai_helper';
-const APP_ID = process.env.APP_ID || 'genie_assistant';
 
 export const maxDuration = 300; // 대용량 파일 처리를 위해 5분으로 확장
 
@@ -31,7 +23,6 @@ export async function POST(
       .from('assistants')
       .select('*')
       .eq('id', id)
-      .eq('app_id', APP_ID)
       .single();
 
     if (fetchErr || !assistant) {
@@ -104,7 +95,6 @@ export async function POST(
       doc_type: docType,
       source_file: fileName,
       gcs_uri: gcsUri,
-      app_id: APP_ID,
     }));
 
     // 배치 삽입 (500개씩)

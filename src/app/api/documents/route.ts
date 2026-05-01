@@ -1,19 +1,11 @@
 import { NextResponse } from 'next/server';
-import { Storage } from '@google-cloud/storage';
 import { createClient } from '@supabase/supabase-js';
-
-const storage = new Storage({
-  keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-  projectId: process.env.GCP_PROJECT_ID,
-});
+import { storage, BUCKET_NAME } from '@/lib/gcs';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 );
-
-const BUCKET_NAME = process.env.GCS_BUCKET_NAME || 'story_ai_helper';
-const APP_ID = process.env.APP_ID || 'genie_assistant';
 
 // GET: 학습된 문서 목록 조회 (pgvector documents 테이블에서)
 export async function GET() {
@@ -23,7 +15,6 @@ export async function GET() {
       .from('documents')
       .select('source_file, gcs_uri, doc_type, created_at')
       .is('assistant_id', null)
-      .eq('app_id', APP_ID)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -99,8 +90,7 @@ export async function DELETE(req: Request) {
         .from('documents')
         .delete({ count: 'exact' })
         .eq('source_file', source)
-        .is('assistant_id', null)
-        .eq('app_id', APP_ID);
+        .is('assistant_id', null);
 
       if (deleteErr) {
         console.error('[Documents] pgvector 삭제 실패:', deleteErr.message);
