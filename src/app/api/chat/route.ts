@@ -355,26 +355,33 @@ export async function POST(req: Request) {
         const allScriptText = scriptFullTexts
           .map(s => `=== 📜 ${s.name} (${s.text.length}자) ===\n${s.text}`)
           .join('\n\n---\n\n');
-        
-        console.log(`[Analyze Script] 전체 대본 ${scriptFullTexts.length}개 로드 (총 ${allScriptText.length}자)`);
+
+        // 공유 자료 RAG 보조 검색
+        const sharedScriptContext = await searchByVector(lastUserMessage, null, 'all', 5);
+
+        console.log(`[Analyze Script] 전체 대본 ${scriptFullTexts.length}개 로드 (총 ${allScriptText.length}자) + 공유 RAG ${sharedScriptContext ? '있음' : '없음'}`);
 
         systemPrompt = `${basePersona}
-        당신은 대본/시나리오 전문 분석가입니다. 
+        당신은 대본/시나리오 전문 분석가입니다.
         사용자가 요청한 대본 분석을 수행하세요.
-        
-        중요: 아래에 대본의 **전체 텍스트**가 제공됩니다. 
+
+        중요: 아래에 대본의 **전체 텍스트**가 제공됩니다.
         처음부터 끝까지 꼼꼼히 읽고, 사용자의 질문에 맞는 정확한 분석을 제공하세요.
         대본의 일부만 보고 답변하지 마세요.
-        
+        [공유 참고 자료]가 있다면 배경 지식으로 보조적으로 활용하세요.
+
         분석 시 다음 관점들을 고려하세요:
         - 서사 구조 (3막 구조, 미드포인트, 시퀀스 분석)
         - 캐릭터 아크 (변화, 성장, 결핍과 극복)
         - 갈등 구조 (내적/외적 갈등, 대립 관계)
         - 대사 분석 (서브텍스트, 캐릭터성 반영)
         - 장면 전환 및 리듬
-        
+
         [전체 대본]
-        ${allScriptText}`;
+        ${allScriptText}
+
+        [공유 참고 자료]
+        ${sharedScriptContext || '없음'}`;
       } else {
         // 대본이 없는 경우 RAG 폴백
         const scriptContext = await searchByVector(lastUserMessage, assistantId, 'script', 20);
@@ -423,14 +430,18 @@ export async function POST(req: Request) {
           .map(s => `=== 📚 ${s.name} (${s.text.length}자) ===\n${s.text}`)
           .join('\n\n---\n\n');
 
-        console.log(`[Analyze Ref] 전체 자료 ${refFullTexts.length}개 로드 (총 ${allRefText.length}자)`);
+        // 공유 자료 RAG 보조 검색
+        const sharedRefContext = await searchByVector(lastUserMessage, null, 'all', 5);
+
+        console.log(`[Analyze Ref] 전체 자료 ${refFullTexts.length}개 로드 (총 ${allRefText.length}자) + 공유 RAG ${sharedRefContext ? '있음' : '없음'}`);
 
         systemPrompt = `${basePersona}
         사용자가 업로드한 참고자료를 기반으로 답변하세요.
-        
+
         중요: 아래에 참고자료의 **전체 텍스트**가 제공됩니다.
         처음부터 끝까지 읽고, 사용자의 질문에 정확히 답변하세요.
-        
+        [공유 참고 자료]가 있다면 보조적으로 활용하세요.
+
         참고자료 분석 시 다음을 수행하세요:
         - 자료의 핵심 내용을 정확히 파악하고 전달
         - 사용자의 질문에 맞는 정보를 자료에서 추출
@@ -438,7 +449,10 @@ export async function POST(req: Request) {
         - 자료의 출처와 맥락을 명시
 
         [전체 참고 자료]
-        ${allRefText}`;
+        ${allRefText}
+
+        [공유 참고 자료]
+        ${sharedRefContext || '없음'}`;
       } else {
         const refContext = await searchByVector(lastUserMessage, assistantId, 'reference', 15);
         systemPrompt = `${basePersona}
@@ -453,14 +467,55 @@ export async function POST(req: Request) {
       break;
     }
 
-    case 'analyze':
+    case 'analyze': {
+      const sharedAnalyzeContext = await searchByVector(lastUserMessage, null, 'all', 5);
+
       systemPrompt = `${basePersona}
       사용자가 제공한 대본, 스토리, 캐릭터 설정을 분석하여 구조적 결함을 짚어내고
-      밀도 높은 전문가적 피드백과 대안을 제시하세요. 분석은 냉정하지만 말투는 건설적이어야 합니다.`;
+      밀도 높은 전문가적 피드백과 대안을 제시하세요. 분석은 냉정하지만 말투는 건설적이어야 합니다.
+      [공유 참고 자료]가 있다면 기존 작품/자료와 대조하여 더 풍부한 피드백을 제공하세요.
+
+      [공유 참고 자료]
+      ${sharedAnalyzeContext || '없음'}`;
       break;
+    }
 
     case 'search': {
-      // 전체 검색 (대본 + 자료 통합)
+      // 보조작가 활성 시: 전용 대본 전체 로드 + 공유 자료 RAG 보조
+      if (assistantId && assistantFiles.length > 0) {
+        const scriptFullTexts: { name: string; text: string }[] = [];
+        for (const fileName of assistantFiles) {
+          const text = await getFullDocumentText(fileName, assistantId);
+          if (text) scriptFullTexts.push({ name: fileName, text });
+        }
+
+        if (scriptFullTexts.length > 0) {
+          const allScriptText = scriptFullTexts
+            .map(s => `=== 📜 ${s.name} ===\n${s.text}`)
+            .join('\n\n---\n\n');
+
+          // 공유 자료 RAG 보조 검색
+          const sharedContext = await searchByVector(lastUserMessage, null, 'all', 5);
+
+          console.log(`[Search+FullText] 전용 대본 ${scriptFullTexts.length}개 로드 (총 ${allScriptText.length}자) + 공유 RAG ${sharedContext ? '있음' : '없음'}`);
+
+          systemPrompt = `${basePersona}
+          당신은 아래 제공된 전용 대본/자료의 전체 내용을 완벽히 숙지하고 있습니다.
+          사용자의 질문에 대해 전용 대본/자료를 주요 근거로 정확하고 구체적으로 답변하세요.
+          캐릭터 이름, 관계, 대사, 장면 등 세부 정보도 정확히 답변할 수 있어야 합니다.
+          [공유 참고 자료]가 있다면 보조적으로 활용하여 답변을 풍부하게 하세요.
+          대본/자료에 없는 내용이라면, 그 사실을 명확히 밝히세요.
+
+          [전체 대본/자료]
+          ${allScriptText}
+
+          [공유 참고 자료]
+          ${sharedContext || '없음'}`;
+          break;
+        }
+      }
+
+      // 보조작가 비활성 또는 문서 없음: 기존 벡터 검색
       const retrievedContext = await searchByVector(lastUserMessage, assistantId, 'all', 10);
 
       systemPrompt = `${basePersona}
@@ -474,10 +529,28 @@ export async function POST(req: Request) {
     }
 
     case 'conversation':
-    default:
+    default: {
+      let conversationContext = '';
+      let sharedConvContext = '';
+      if (assistantId && assistantFiles.length > 0) {
+        const scriptFullTexts: { name: string; text: string }[] = [];
+        for (const fileName of assistantFiles) {
+          const text = await getFullDocumentText(fileName, assistantId);
+          if (text) scriptFullTexts.push({ name: fileName, text });
+        }
+        if (scriptFullTexts.length > 0) {
+          conversationContext = scriptFullTexts
+            .map(s => `=== 📜 ${s.name} ===\n${s.text}`)
+            .join('\n\n---\n\n');
+        }
+        sharedConvContext = await searchByVector(lastUserMessage, null, 'all', 5);
+      }
+
       systemPrompt = `${basePersona}
-      사용자의 창작 활동에 영감을 주고, 창작의 고통에 깊이 공감하며 응원과 정서적 지지를 제공하세요.`;
+      사용자의 창작 활동에 영감을 주고, 창작의 고통에 깊이 공감하며 응원과 정서적 지지를 제공하세요.
+      ${conversationContext ? `\n당신은 아래 전용 대본/자료의 내용을 숙지하고 있습니다. 대화 중 관련 내용이 나오면 자연스럽게 활용하세요.\n[공유 참고 자료]가 있다면 보조적으로 참고하세요.\n\n[전체 대본/자료]\n${conversationContext}\n\n[공유 참고 자료]\n${sharedConvContext || '없음'}` : ''}`;
       break;
+    }
   }
   
   // 4. Gemini startChat() 멀티턴 대화

@@ -192,6 +192,8 @@
   padding: 0.85em 1em;
   margin: 0.75em 0;
   overflow-x: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
 }
 
 .markdown-body pre code {
@@ -202,6 +204,8 @@
   font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
   color: hsl(210 50% 80%);
   line-height: 1.6;
+  white-space: pre-wrap;
+  word-wrap: break-word;
 }
 
 /* 인용문 */

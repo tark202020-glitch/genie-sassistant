@@ -22,4 +22,10 @@ export interface Assistant {
 
 export type UploadStep = 'idle' | 'uploading-gcs' | 'importing-ai' | 'complete' | 'error';
 
-export type SidebarTab = 'shared' | 'assistants';
+export interface Conversation {
+  id: string;
+  title: string;
+  assistant_id: string | null;
+  assistant_name?: string | null;
+  updated_at: string;
+}

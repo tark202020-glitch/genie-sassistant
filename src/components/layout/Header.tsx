@@ -1,22 +1,26 @@
 'use client';
 
-import { PanelLeft, Bot, X, BarChart3, Users } from 'lucide-react';
+import { PanelLeft, Bot, X, BarChart3, Users, LogOut, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ThemeToggle } from '@/components/shared/ThemeToggle';
 import type { Assistant } from '@/types';
+
+const APP_VERSION = 'V1.000';
 
 interface HeaderProps {
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
   activeAssistant: Assistant | null;
   onDeactivateAssistant: () => void;
+  userEmail?: string | null;
 }
 
 export function Header({
@@ -24,6 +28,7 @@ export function Header({
   onToggleSidebar,
   activeAssistant,
   onDeactivateAssistant,
+  userEmail,
 }: HeaderProps) {
   return (
     <header className="py-3 px-6 border-b border-border flex items-center gap-3">
@@ -32,8 +37,11 @@ export function Header({
           <PanelLeft className="w-4 h-4" />
         </Button>
       )}
-      <div className="flex-1">
-        <h1 className="text-xl font-bold text-foreground">Genie Assistant</h1>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-bold text-foreground">Genie Assistant</h1>
+          <span className="text-xs text-muted-foreground/50 font-mono">{APP_VERSION}</span>
+        </div>
         {activeAssistant ? (
           <div className="flex items-center gap-2 mt-0.5">
             <Badge variant="secondary" className="bg-purple-500/20 text-purple-400 border-0">
@@ -54,6 +62,13 @@ export function Header({
           </p>
         )}
       </div>
+
+      {userEmail && (
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <User className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">{userEmail}</span>
+        </div>
+      )}
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -84,6 +99,19 @@ export function Header({
       </DropdownMenu>
 
       <ThemeToggle />
+
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8"
+        title="로그아웃"
+        onClick={async () => {
+          await fetch('/api/auth/logout', { method: 'POST' });
+          window.location.href = '/login';
+        }}
+      >
+        <LogOut className="w-4 h-4" />
+      </Button>
     </header>
   );
 }

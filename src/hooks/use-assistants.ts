@@ -9,7 +9,6 @@ export function useAssistants() {
 
   const [assistants, setAssistants] = useState<Assistant[]>([]);
   const [loadingAssistants, setLoadingAssistants] = useState(false);
-  const [selectedAssistant, setSelectedAssistant] = useState<Assistant | null>(null);
   const [activeAssistantId, setActiveAssistantId] = useState<string | null>(null);
 
   // 생성 폼
@@ -26,6 +25,8 @@ export function useAssistants() {
   const [assistantUploadStep, setAssistantUploadStep] = useState<UploadStep>('idle');
   const [assistantUploadMessage, setAssistantUploadMessage] = useState('');
   const [assistantDocType, setAssistantDocType] = useState<DocType>('script');
+
+  const activeAssistant = assistants.find(a => a.id === activeAssistantId) || null;
 
   const fetchAssistants = useCallback(async () => {
     setLoadingAssistants(true);
@@ -90,7 +91,6 @@ export function useAssistants() {
       const data = await res.json();
       if (data.success) {
         if (activeAssistantId === id) setActiveAssistantId(null);
-        if (selectedAssistant?.id === id) setSelectedAssistant(null);
         toast.success(`"${name}" 보조작가 삭제 완료`);
         fetchAssistants();
       } else {
@@ -99,10 +99,10 @@ export function useAssistants() {
     } catch {
       toast.error('보조작가 삭제 중 오류 발생');
     }
-  }, [activeAssistantId, selectedAssistant, fetchAssistants]);
+  }, [activeAssistantId, fetchAssistants]);
 
   const handleAssistantFileUpload = useCallback(async () => {
-    if (assistantFiles.length === 0 || !selectedAssistant) return;
+    if (assistantFiles.length === 0 || !activeAssistantId) return;
     const total = assistantFiles.length;
     const typeLabel = assistantDocType === 'reference' ? '참고자료' : '대본';
     let successCount = 0;
@@ -117,7 +117,7 @@ export function useAssistants() {
         const formData = new FormData();
         formData.append('file', currentFile);
         formData.append('docType', assistantDocType);
-        const res = await fetch(`/api/assistants/${selectedAssistant.id}/ingest`, { method: 'POST', body: formData });
+        const res = await fetch(`/api/assistants/${activeAssistantId}/ingest`, { method: 'POST', body: formData });
         const data = await res.json();
         if (data.success) {
           setAssistantUploadStep('importing-ai');
@@ -144,17 +144,17 @@ export function useAssistants() {
     }
     setAssistantFiles([]);
     if (assistantFileInputRef.current) assistantFileInputRef.current.value = '';
-    fetchAssistantDocs(selectedAssistant.id);
+    fetchAssistantDocs(activeAssistantId);
     setTimeout(() => {
       setAssistantUploadStep('idle');
       setAssistantUploadMessage('');
     }, 5000);
-  }, [assistantFiles, selectedAssistant, assistantDocType, fetchAssistantDocs]);
+  }, [assistantFiles, activeAssistantId, assistantDocType, fetchAssistantDocs]);
 
   const handleDeleteAssistantDoc = useCallback(async (doc: LearnedDocument) => {
-    if (!selectedAssistant) return;
+    if (!activeAssistantId) return;
     try {
-      const res = await fetch(`/api/assistants/${selectedAssistant.id}/documents`, {
+      const res = await fetch(`/api/assistants/${activeAssistantId}/documents`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ source: doc.source, gcsUri: doc.gcsUri, docName: doc.docName }),
@@ -162,27 +162,23 @@ export function useAssistants() {
       const data = await res.json();
       if (data.success) {
         toast.success(`"${doc.source}" 삭제 완료`);
-        fetchAssistantDocs(selectedAssistant.id);
+        fetchAssistantDocs(activeAssistantId);
       } else {
         toast.error(`삭제 실패: ${data.error}`);
       }
     } catch {
       toast.error('문서 삭제 중 오류 발생');
     }
-  }, [selectedAssistant, fetchAssistantDocs]);
+  }, [activeAssistantId, fetchAssistantDocs]);
 
   const clearAssistantUploadState = useCallback(() => {
     setAssistantUploadStep('idle');
     setAssistantUploadMessage('');
   }, []);
 
-  const activeAssistant = assistants.find(a => a.id === activeAssistantId) || null;
-
   return {
     assistants,
     loadingAssistants,
-    selectedAssistant,
-    setSelectedAssistant,
     activeAssistantId,
     setActiveAssistantId,
     activeAssistant,

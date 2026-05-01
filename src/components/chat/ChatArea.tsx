@@ -29,8 +29,8 @@ export function ChatArea({
   const { messagesEndRef } = useChatScroll(messages);
 
   return (
-    <div className="flex-1 flex flex-col min-w-0">
-      <ScrollArea className="flex-1">
+    <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <ScrollArea className="flex-1 overflow-hidden">
         <div className="py-4 px-6 space-y-6">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-[60vh] text-muted-foreground">
