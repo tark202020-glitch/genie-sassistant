@@ -39,6 +39,10 @@ export function EpisodeSummaryTab({ assistantId }: EpisodeSummaryTabProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ assistantId, analysisType: 'episodes' }),
       });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.error || `서버 오류 (${res.status})`);
+      }
       const data = await res.json();
       if (data.success) {
         setSummaries(data.data);
@@ -46,7 +50,7 @@ export function EpisodeSummaryTab({ assistantId }: EpisodeSummaryTabProps) {
         setError(data.error || '분석 실패');
       }
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || '화별 요약 분석 중 오류가 발생했습니다.');
     } finally {
       setAnalyzing(false);
     }

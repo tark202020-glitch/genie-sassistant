@@ -15,7 +15,42 @@ const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
 
 export const maxDuration = 300;
 
-// 대본 로딩 + 화별 그룹핑 (character-graph와 동일 로직)
+// Gemini 호출 + 재시도 + JSON 파싱 안전 래퍼
+async function callGeminiJSON(model: any, prompt: string, retries = 3): Promise<any> {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
+
+      // JSON 파싱 시도
+      try {
+        return JSON.parse(text);
+      } catch {
+        // 텍스트에서 JSON 부분만 추출 시도
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          return JSON.parse(jsonMatch[0]);
+        }
+        throw new Error(`Gemini 응답이 유효한 JSON이 아닙니다: ${text.slice(0, 200)}`);
+      }
+    } catch (err: any) {
+      const isRateLimit = err.message?.includes('429') || err.message?.includes('Resource has been exhausted');
+      const isServerError = err.message?.includes('500') || err.message?.includes('503');
+
+      if ((isRateLimit || isServerError) && attempt < retries) {
+        const delay = isRateLimit ? 15000 * attempt : 5000 * attempt;
+        console.log(`[ScriptOrganizer] Gemini 호출 재시도 ${attempt}/${retries} (${delay/1000}초 대기)...`);
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+
+      throw err;
+    }
+  }
+  throw new Error('Gemini 호출 최대 재시도 초과');
+}
+
+// 대본 로딩 + 화별 그룹핑
 async function loadScripts(assistantId: string) {
   const { data: assistant } = await supabase
     .from('assistants')
@@ -36,14 +71,12 @@ async function loadScripts(assistantId: string) {
     throw new Error(`${assistant.name}에 업로드된 대본이 없습니다.`);
   }
 
-  // source_file별 그룹화
   const fileGroups = new Map<string, string[]>();
   for (const doc of docs) {
     if (!fileGroups.has(doc.source_file)) fileGroups.set(doc.source_file, []);
     fileGroups.get(doc.source_file)!.push(doc.content);
   }
 
-  // 화별 최신 버전 필터
   const episodeMap = new Map<string, { sourceFile: string; version: number; chunks: string[] }>();
   for (const [sourceFile, chunks] of fileGroups) {
     const epMatch = sourceFile.match(/(\d+)\s*[화회부]|ep\s*(\d+)/i);
@@ -79,14 +112,29 @@ export async function POST(req: Request) {
 
     const model = genAI.getGenerativeModel({
       model: 'gemini-2.5-flash',
-      generationConfig: { responseMimeType: 'application/json' },
+      generationConfig: {
+        responseMimeType: 'application/json',
+        temperature: 0.3,
+      },
     });
 
     if (analysisType === 'settings') {
       // === 배경/공간 분석 ===
-      const combinedText = scripts
-        .map(s => `=== ${s.fileName} ===\n${s.text.slice(0, 30000)}`)
-        .join('\n\n');
+      // 대본 텍스트를 적절한 크기로 제한 (토큰 초과 방지)
+      const MAX_CHARS_PER_SCRIPT = 20000;
+      const MAX_TOTAL_CHARS = 80000;
+
+      let combinedText = '';
+      for (const s of scripts) {
+        const chunk = `=== ${s.fileName} ===\n${s.text.slice(0, MAX_CHARS_PER_SCRIPT)}\n\n`;
+        if (combinedText.length + chunk.length > MAX_TOTAL_CHARS) {
+          console.log(`[ScriptOrganizer] 텍스트 크기 제한 도달, ${scripts.indexOf(s)}/${scripts.length} 대본까지만 포함`);
+          break;
+        }
+        combinedText += chunk;
+      }
+
+      console.log(`[ScriptOrganizer] 배경 분석 텍스트 길이: ${combinedText.length}자`);
 
       const prompt = `다음은 드라마/시나리오 대본입니다. 이 대본에서 모든 배경(장소/공간)과 공간 간의 관계를 분석해주세요.
 
@@ -112,8 +160,7 @@ export async function POST(req: Request) {
 대본:
 ${combinedText}`;
 
-      const result = await model.generateContent(prompt);
-      const extracted = JSON.parse(result.response.text());
+      const extracted = await callGeminiJSON(model, prompt);
 
       const nodes = (extracted.locations || []).map((loc: any) => ({
         id: loc.name,
@@ -144,19 +191,22 @@ ${combinedText}`;
         },
       };
 
-      // 자동 저장
       await autoSave(assistantId, 'settings', data);
-
       return NextResponse.json({ success: true, data });
 
     } else if (analysisType === 'episodes') {
       // === 화별 요약 ===
       const summaries = [];
+      const errors: string[] = [];
 
       for (const script of scripts) {
         console.log(`[ScriptOrganizer] ${script.fileName} 요약 생성 중...`);
 
-        const prompt = `다음은 드라마 대본 한 회차(에피소드)입니다. 아래 항목들을 분석해주세요.
+        try {
+          // 텍스트 크기 제한
+          const scriptText = script.text.slice(0, 40000);
+
+          const prompt = `다음은 드라마 대본 한 회차(에피소드)입니다. 아래 항목들을 분석해주세요.
 
 분석 항목:
 1. plot_summary: 3-5문장으로 이 회차의 줄거리 요약
@@ -177,31 +227,44 @@ ${combinedText}`;
 }
 
 대본:
-${script.text.slice(0, 50000)}`;
+${scriptText}`;
 
-        const result = await model.generateContent(prompt);
-        const parsed = JSON.parse(result.response.text());
+          const parsed = await callGeminiJSON(model, prompt);
 
-        const epNum: number = parseInt(script.episode) || (summaries.length + 1);
-        summaries.push({
-          episode: epNum,
-          fileName: script.fileName,
-          plotSummary: parsed.plot_summary || '',
-          keyCharacters: parsed.key_characters || [],
-          keyLocations: parsed.key_locations || [],
-          emotionalTone: parsed.emotional_tone || '',
-          emotionalArc: parsed.emotional_arc || '',
-          keyEvents: parsed.key_events || [],
-        });
+          const epNum: number = parseInt(script.episode) || (summaries.length + 1);
+          summaries.push({
+            episode: epNum,
+            fileName: script.fileName,
+            plotSummary: parsed.plot_summary || '',
+            keyCharacters: parsed.key_characters || [],
+            keyLocations: parsed.key_locations || [],
+            emotionalTone: parsed.emotional_tone || '',
+            emotionalArc: parsed.emotional_arc || '',
+            keyEvents: parsed.key_events || [],
+          });
+
+          // rate limit 방지: 각 호출 사이 간격
+          if (scripts.indexOf(script) < scripts.length - 1) {
+            await new Promise(r => setTimeout(r, 2000));
+          }
+        } catch (err: any) {
+          console.error(`[ScriptOrganizer] ${script.fileName} 분석 실패:`, err.message);
+          errors.push(`${script.fileName}: ${err.message}`);
+          // 개별 실패해도 나머지는 계속 진행
+        }
       }
 
-      // 화번호로 정렬
       summaries.sort((a, b) => a.episode - b.episode);
 
-      // 자동 저장
-      await autoSave(assistantId, 'episodes', summaries);
+      if (summaries.length > 0) {
+        await autoSave(assistantId, 'episodes', summaries);
+      }
 
-      return NextResponse.json({ success: true, data: summaries });
+      return NextResponse.json({
+        success: true,
+        data: summaries,
+        ...(errors.length > 0 ? { warnings: errors } : {}),
+      });
 
     } else {
       return NextResponse.json({ error: '유효하지 않은 분석 유형입니다.' }, { status: 400 });
@@ -209,7 +272,7 @@ ${script.text.slice(0, 50000)}`;
 
   } catch (err: any) {
     console.error('[ScriptOrganizer Error]', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: err.message || '분석 중 오류가 발생했습니다.' }, { status: 500 });
   }
 }
 
@@ -218,7 +281,6 @@ async function autoSave(assistantId: string, analysisType: string, data: any) {
   try {
     const name = `자동 저장`;
 
-    // 기존 자동 저장 데이터가 있으면 업데이트
     const { data: existing } = await supabase
       .from('script_analyses')
       .select('id')
