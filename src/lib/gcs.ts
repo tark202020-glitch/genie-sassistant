@@ -3,17 +3,24 @@ import { Storage } from '@google-cloud/storage';
 function createStorage(): Storage {
   const projectId = process.env.GCP_PROJECT_ID;
 
-  // Vercel 등 배포 환경: JSON 키를 환경변수로 직접 전달
-  if (process.env.GCS_CREDENTIALS) {
-    const credentials = JSON.parse(process.env.GCS_CREDENTIALS);
-    return new Storage({ credentials, projectId });
+  const credJson = process.env.GCS_CREDENTIALS || process.env.GOOGLE_APPLICATION_CREDENTIALS || '';
+
+  // JSON 문자열인 경우 (Vercel 등 배포 환경)
+  if (credJson.trim().startsWith('{')) {
+    try {
+      const credentials = JSON.parse(credJson);
+      return new Storage({ credentials, projectId });
+    } catch {
+      // JSON 파싱 실패 시 파일 경로로 시도
+    }
   }
 
-  // 로컬 환경: 파일 경로 사용
-  return new Storage({
-    keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-    projectId,
-  });
+  // 파일 경로인 경우 (로컬 환경)
+  if (credJson) {
+    return new Storage({ keyFilename: credJson, projectId });
+  }
+
+  return new Storage({ projectId });
 }
 
 export const storage = createStorage();
