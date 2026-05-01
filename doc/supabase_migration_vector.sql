@@ -110,3 +110,15 @@ CREATE UNIQUE INDEX IF NOT EXISTS document_summaries_source_file_assistant
 --
 -- 3) assistants 테이블에 response_style 컬럼 추가:
 -- ALTER TABLE assistants ADD COLUMN IF NOT EXISTS response_style TEXT;
+--
+-- 4) script_analyses 테이블 생성 (대본 정리 분석 캐시):
+-- CREATE TABLE IF NOT EXISTS script_analyses (
+--   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--   assistant_id UUID NOT NULL REFERENCES assistants(id) ON DELETE CASCADE,
+--   name TEXT NOT NULL,
+--   analysis_type TEXT NOT NULL,  -- 'settings' | 'episodes'
+--   data JSONB NOT NULL,
+--   created_at TIMESTAMPTZ DEFAULT NOW(),
+--   updated_at TIMESTAMPTZ DEFAULT NOW()
+-- );
+-- CREATE INDEX IF NOT EXISTS script_analyses_assistant_id_idx ON script_analyses(assistant_id);

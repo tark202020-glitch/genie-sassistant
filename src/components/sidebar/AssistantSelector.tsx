@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Bot, ChevronDown, Plus, CheckCircle2, Pin, Trash2, Users, Sparkles, Save, Settings, RotateCcw } from 'lucide-react';
+import { Bot, ChevronDown, Plus, CheckCircle2, Pin, Trash2, Users, Sparkles, Save, Settings, RotateCcw, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -212,6 +212,30 @@ export function AssistantSelector({ assistantsHook, savedGraphs }: AssistantSele
                   </a>
                 </DropdownMenuItem>
               ))}
+            </>
+          )}
+
+          {/* 대본 정리 */}
+          {activeAssistant && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="text-xs text-muted-foreground font-normal flex items-center gap-1.5">
+                <BookOpen className="w-3.5 h-3.5" /> 대본 정리
+              </DropdownMenuLabel>
+              <DropdownMenuItem asChild>
+                <a
+                  href={`/script-organizer?assistantId=${activeAssistant.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="cursor-pointer"
+                >
+                  <BookOpen className="w-3.5 h-3.5 mr-2 text-amber-500" />
+                  <div className="flex-1">
+                    <p className="text-sm">대본 분석 & 정리</p>
+                    <p className="text-xs text-muted-foreground">캐릭터·배경·화별 요약</p>
+                  </div>
+                </a>
+              </DropdownMenuItem>
             </>
           )}
         </DropdownMenuContent>
