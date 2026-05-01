@@ -1,5 +1,33 @@
 # Genie Assistant Changelog
 
+## [V1.025] - 2026-05-01
+
+### 📖 대본 정리 페이지 (Script Organizer)
+- **Summary**: 작가가 자신의 대본을 시각적으로 분석·정리할 수 있는 전용 페이지 추가 (캐릭터 관계도, 배경 다이어그램, 화별 요약 3탭)
+- **Detail**:
+  - ✅ `src/app/script-organizer/page.tsx`: 3탭 레이아웃 (캐릭터/배경/화별요약)
+  - ✅ `src/components/script-organizer/CharacterTab.tsx`: 기존 character-graph API 재사용, Canvas 물리 시뮬레이션
+  - ✅ `src/components/script-organizer/SettingDiagramTab.tsx`: AI 배경 분석 탭 (캐시 우선 로드)
+  - ✅ `src/components/script-organizer/SettingCanvas.tsx`: 장소 노드 다이어그램 (유형별 색상, 드래그/줌)
+  - ✅ `src/components/script-organizer/EpisodeSummaryTab.tsx`: 화별 요약 탭 (캐시 우선 로드)
+  - ✅ `src/components/script-organizer/EpisodeCard.tsx`: 에피소드 카드 (줄거리, 감정톤, 핵심인물/장소)
+  - ✅ `src/types/script-organizer.ts`: SettingNode, SettingEdge, EpisodeSummary 타입 + 색상 상수
+  - ✅ `src/app/api/script-organizer/analyze/route.ts`: Gemini 배경/화별 분석 API + DB 자동 저장
+  - ✅ `src/app/api/script-analyses/route.ts`: 분석 결과 CRUD (캐시 레이어)
+  - ✅ `src/components/sidebar/AssistantSelector.tsx`: "대본 정리" 메뉴 추가
+  - ✅ `doc/supabase_migration_vector.sql`: script_analyses 테이블 문서화
+  - ⚠️ **Supabase에서 script_analyses 테이블 생성 필요** (SQL 파일 참조)
+- **Build Time**: 2026-05-01
+
+### 채팅 입력창 자동 확장 + 문서 요약 + 응답 스타일 커스터마이징
+- **Summary**: 긴 글 작성을 위한 입력창 자동 높이 조절, 문서 클릭 시 요약 모달, 보조작가 응답 스타일 편집 기능
+- **Detail**:
+  - ✅ 채팅 입력창 자동 높이 (max 320px)
+  - ✅ 문서 핵심 요약: 업로드 시 자동 생성 + 클릭 시 모달 표시
+  - ✅ 보조작가 응답 스타일 커스터마이징 UI (설정 다이얼로그)
+  - ⚠️ **Supabase에서 document_summaries 테이블 + response_style 컬럼 추가 필요**
+- **Build Time**: 2026-05-01
+
 ## [V1.024] - 2026-05-01
 
 ### 🔍 RAG 파일 지정 검색 개선
