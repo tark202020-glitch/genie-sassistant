@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useCallback, useState, type FormEvent, type KeyboardEvent, type DragEvent } from 'react';
+import { useRef, useCallback, useState, useEffect, type FormEvent, type KeyboardEvent, type DragEvent } from 'react';
 import { SendHorizontal, Plus, X, FileText, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -41,8 +41,17 @@ export function ChatInput({
   onRemoveAttachment,
 }: ChatInputProps) {
   const formRef = useRef<HTMLFormElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+
+  // 텍스트 내용에 맞춰 높이 자동 조절
+  useEffect(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    ta.style.height = 'auto';
+    ta.style.height = `${Math.min(ta.scrollHeight, 320)}px`;
+  }, [input]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -173,7 +182,8 @@ export function ChatInput({
           onChange={handleFileChange}
         />
         <Textarea
-          className="flex-1 min-h-[52px] max-h-[200px] resize-none rounded-lg px-5 py-3.5 bg-white dark:bg-background border-border focus-visible:ring-1 focus-visible:ring-ring"
+          ref={textareaRef}
+          className="flex-1 min-h-[52px] max-h-[320px] resize-none rounded-lg px-5 py-3.5 bg-white dark:bg-background border-border focus-visible:ring-1 focus-visible:ring-ring transition-[height] duration-100"
           value={input}
           placeholder={
             activeAssistantName
