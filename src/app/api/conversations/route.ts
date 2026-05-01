@@ -12,6 +12,7 @@ const APP_ID = process.env.APP_ID || 'genie_assistant';
 export async function GET(req: Request) {
   try {
     const user = await getCurrentUser();
+    console.log('[GET /api/conversations] user:', user ? { id: user.id, username: user.username } : null);
 
     const url = new URL(req.url);
     const assistantId = url.searchParams.get('assistantId');
@@ -32,6 +33,7 @@ export async function GET(req: Request) {
     }
 
     const { data, error } = await query;
+    console.log('[GET /api/conversations] result count:', data?.length, 'error:', error);
     if (error) throw error;
 
     const assistantIds = [...new Set((data || []).map((c: Record<string, unknown>) => c.assistant_id).filter(Boolean))];
