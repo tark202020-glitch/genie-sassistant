@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
-import { ChevronRight, ChevronDown, FolderOpen, Upload, FileText, Scroll, BookOpen, Trash2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ChevronRight, ChevronDown, FolderOpen, Upload, FileText, Scroll, BookOpen, Trash2, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { UploadProgress } from '@/components/shared/UploadProgress';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import type { useDocuments } from '@/hooks/use-documents';
@@ -15,11 +16,9 @@ interface DocumentsSectionProps {
   assistantsHook: ReturnType<typeof useAssistants>;
 }
 
-type DocTab = 'shared' | 'assistant';
-
 export function DocumentsSection({ documents, assistantsHook }: DocumentsSectionProps) {
   const [expanded, setExpanded] = useState(false);
-  const [docTab, setDocTab] = useState<DocTab>('shared');
+  const [showAll, setShowAll] = useState(false);
   const [confirmDoc, setConfirmDoc] = useState<LearnedDocument | null>(null);
   const [confirmSource, setConfirmSource] = useState<'shared' | 'assistant'>('shared');
 
@@ -28,16 +27,20 @@ export function DocumentsSection({ documents, assistantsHook }: DocumentsSection
   const scripts = assistantDocs.filter((d) => d.docType !== 'reference');
   const references = assistantDocs.filter((d) => d.docType === 'reference');
 
-  const sharedCount = documents.documents.length;
-  const assistantDocCount = assistantDocs.length;
+  // 보조작가 전환 시 showAll 리셋
+  useEffect(() => {
+    setShowAll(false);
+  }, [activeAssistant?.id]);
 
-  const summaryParts: string[] = [];
-  if (sharedCount > 0) summaryParts.push(`공유 ${sharedCount}`);
-  if (activeAssistant) {
-    if (scripts.length > 0) summaryParts.push(`대본 ${scripts.length}`);
-    if (references.length > 0) summaryParts.push(`자료 ${references.length}`);
-  }
-  const summaryText = summaryParts.length > 0 ? summaryParts.join(' · ') : '없음';
+  // 모드별 요약 텍스트
+  const summaryText = activeAssistant
+    ? (assistantDocs.length > 0
+        ? [scripts.length > 0 && `대본 ${scripts.length}`, references.length > 0 && `자료 ${references.length}`].filter(Boolean).join(' · ') || '없음'
+        : '없음')
+    : (documents.documents.length > 0 ? `${documents.documents.length}개 자료` : '없음');
+
+  // 현재 모드의 문서 수
+  const docCount = activeAssistant ? assistantDocs.length : documents.documents.length;
 
   return (
     <div className="border-t border-border">
@@ -46,59 +49,67 @@ export function DocumentsSection({ documents, assistantsHook }: DocumentsSection
         onClick={() => setExpanded(!expanded)}
         className="w-full px-3 py-2.5 flex items-center justify-between hover:bg-muted/50 transition-colors"
       >
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 min-w-0">
           {expanded ? (
-            <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+            <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
           ) : (
-            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
+            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
           )}
-          <FolderOpen className="w-4 h-4" />
-          <span className="text-sm font-medium">학습자료 관리</span>
+          <FolderOpen className="w-4 h-4 shrink-0" />
+          <span className="text-sm font-medium">학습자료</span>
+          {activeAssistant && (
+            <span className="text-[11px] text-muted-foreground truncate max-w-[100px]">
+              · {activeAssistant.name}
+            </span>
+          )}
         </div>
-        <span className="text-xs text-muted-foreground">{summaryText}</span>
+        <span className="text-xs text-muted-foreground shrink-0 ml-2">{summaryText}</span>
       </button>
 
       {expanded && (
         <div className="border-t border-border/50">
-          {/* 공유/전용 서브탭 */}
-          <div className="flex gap-1 px-3 pt-2 pb-1">
-            <Button
-              variant={docTab === 'shared' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setDocTab('shared')}
-              className={`flex-1 h-8 text-sm ${docTab === 'shared' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40 hover:bg-blue-500/30' : ''}`}
-            >
-              <BookOpen className="w-3.5 h-3.5 mr-1" />
-              공유
-            </Button>
-            <Button
-              variant={docTab === 'assistant' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setDocTab('assistant')}
-              disabled={!activeAssistant}
-              className={`flex-1 h-8 text-sm ${docTab === 'assistant' ? 'bg-purple-500/20 text-purple-400 border border-purple-500/40 hover:bg-purple-500/30' : ''}`}
-            >
-              <Scroll className="w-3.5 h-3.5 mr-1" />
-              전용
-            </Button>
+          <div
+            key={activeAssistant?.id ?? 'shared'}
+            className="animate-in fade-in duration-200"
+          >
+            {activeAssistant ? (
+              <AssistantDocContent
+                assistantsHook={assistantsHook}
+                showAll={showAll}
+                onDeleteRequest={(doc) => {
+                  setConfirmDoc(doc);
+                  setConfirmSource('assistant');
+                }}
+              />
+            ) : (
+              <SharedDocContent
+                documents={documents}
+                showAll={showAll}
+                onDeleteRequest={(doc) => {
+                  setConfirmDoc(doc);
+                  setConfirmSource('shared');
+                }}
+              />
+            )}
           </div>
 
-          {docTab === 'shared' ? (
-            <SharedDocContent
-              documents={documents}
-              onDeleteRequest={(doc) => {
-                setConfirmDoc(doc);
-                setConfirmSource('shared');
-              }}
-            />
-          ) : (
-            <AssistantDocContent
-              assistantsHook={assistantsHook}
-              onDeleteRequest={(doc) => {
-                setConfirmDoc(doc);
-                setConfirmSource('assistant');
-              }}
-            />
+          {/* 더 보기 토글 */}
+          {docCount > 6 && (
+            <div className="px-3 py-1.5 border-t border-border/30">
+              <button
+                onClick={() => setShowAll(!showAll)}
+                className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-1"
+              >
+                {showAll ? (
+                  <>
+                    <ChevronUp className="w-3 h-3" />
+                    접기
+                  </>
+                ) : (
+                  `+${docCount - 6}개 더 보기`
+                )}
+              </button>
+            </div>
           )}
         </div>
       )}
@@ -127,13 +138,15 @@ export function DocumentsSection({ documents, assistantsHook }: DocumentsSection
 
 function SharedDocContent({
   documents,
+  showAll,
   onDeleteRequest,
 }: {
   documents: ReturnType<typeof useDocuments>;
+  showAll: boolean;
   onDeleteRequest: (doc: LearnedDocument) => void;
 }) {
   return (
-    <div className="max-h-64 flex flex-col">
+    <div className={`${showAll ? 'max-h-[50vh]' : 'max-h-80'} flex flex-col transition-all duration-300`}>
       {/* 업로드 */}
       <div className="px-3 py-2">
         <input
@@ -167,7 +180,7 @@ function SharedDocContent({
       <UploadProgress step={documents.uploadStep} message={documents.uploadMessage} onClose={documents.clearUploadState} />
 
       {/* 문서 목록 */}
-      <div className="overflow-y-auto flex-1">
+      <ScrollArea className="flex-1">
         {documents.loadingDocs ? (
           <div className="px-3 py-2 space-y-1.5">
             {[1, 2].map((i) => <Skeleton key={i} className="h-6 w-full" />)}
@@ -186,32 +199,25 @@ function SharedDocContent({
             ))}
           </div>
         )}
-      </div>
+      </ScrollArea>
     </div>
   );
 }
 
 function AssistantDocContent({
   assistantsHook,
+  showAll,
   onDeleteRequest,
 }: {
   assistantsHook: ReturnType<typeof useAssistants>;
+  showAll: boolean;
   onDeleteRequest: (doc: LearnedDocument) => void;
 }) {
-  const activeAssistant = assistantsHook.activeAssistant;
   const scripts = assistantsHook.assistantDocs.filter((d) => d.docType !== 'reference');
   const references = assistantsHook.assistantDocs.filter((d) => d.docType === 'reference');
 
-  if (!activeAssistant) {
-    return (
-      <p className="text-sm text-muted-foreground text-center py-3">
-        보조작가를 활성화하면 전용 학습자료를 관리할 수 있습니다.
-      </p>
-    );
-  }
-
   return (
-    <div className="max-h-64 flex flex-col">
+    <div className={`${showAll ? 'max-h-[50vh]' : 'max-h-80'} flex flex-col transition-all duration-300`}>
       {/* 업로드 */}
       <div className="px-3 py-2">
         <div className="flex gap-1 mb-1.5">
@@ -219,7 +225,7 @@ function AssistantDocContent({
             variant={assistantsHook.assistantDocType === 'script' ? 'default' : 'ghost'}
             size="sm"
             onClick={() => assistantsHook.setAssistantDocType('script')}
-            className={`flex-1 h-7 text-xs ${assistantsHook.assistantDocType === 'script' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40 hover:bg-amber-500/30' : ''}`}
+            className={`flex-1 h-7 text-xs ${assistantsHook.assistantDocType === 'script' ? 'bg-terracotta/15 text-terracotta border border-terracotta/30 hover:bg-terracotta/25' : ''}`}
           >
             <Scroll className="w-3 h-3 mr-0.5" />
             대본
@@ -228,7 +234,7 @@ function AssistantDocContent({
             variant={assistantsHook.assistantDocType === 'reference' ? 'default' : 'ghost'}
             size="sm"
             onClick={() => assistantsHook.setAssistantDocType('reference')}
-            className={`flex-1 h-7 text-xs ${assistantsHook.assistantDocType === 'reference' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40 hover:bg-blue-500/30' : ''}`}
+            className={`flex-1 h-7 text-xs ${assistantsHook.assistantDocType === 'reference' ? 'bg-accent text-accent-foreground border border-accent hover:bg-accent/80' : ''}`}
           >
             <BookOpen className="w-3 h-3 mr-0.5" />
             자료
@@ -249,11 +255,7 @@ function AssistantDocContent({
           onClick={assistantsHook.handleAssistantFileUpload}
           disabled={assistantsHook.assistantFiles.length === 0 || assistantsHook.assistantUploadStep !== 'idle'}
           size="sm"
-          className={`w-full text-sm h-8 ${
-            assistantsHook.assistantDocType === 'script'
-              ? 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500'
-              : 'bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500'
-          }`}
+          className="w-full text-sm h-8 bg-terracotta hover:bg-terracotta/90 text-white"
         >
           {assistantsHook.assistantUploadStep !== 'idle' && assistantsHook.assistantUploadStep !== 'error' ? (
             '학습 중...'
@@ -272,7 +274,7 @@ function AssistantDocContent({
       <UploadProgress step={assistantsHook.assistantUploadStep} message={assistantsHook.assistantUploadMessage} onClose={assistantsHook.clearAssistantUploadState} />
 
       {/* 문서 목록 */}
-      <div className="overflow-y-auto flex-1">
+      <ScrollArea className="flex-1">
         {assistantsHook.loadingAssistantDocs ? (
           <div className="px-3 py-2 space-y-1.5">
             {[1, 2].map((i) => <Skeleton key={i} className="h-6 w-full" />)}
@@ -282,9 +284,9 @@ function AssistantDocContent({
         ) : (
           <div className="divide-y divide-border/30">
             {scripts.length > 0 && (
-              <div className="px-3 pt-1.5 pb-0.5">
-                <p className="text-xs font-bold text-amber-400/80 uppercase tracking-wider flex items-center gap-1">
-                  <Scroll className="w-3 h-3" /> 대본
+              <div className="px-3 py-1 bg-muted/30 sticky top-0 z-10">
+                <p className="text-[11px] font-semibold text-terracotta uppercase tracking-wider flex items-center gap-1">
+                  <Scroll className="w-3 h-3" /> 대본 ({scripts.length})
                 </p>
               </div>
             )}
@@ -292,9 +294,9 @@ function AssistantDocContent({
               <DocItem key={doc.id || doc.source} doc={doc} icon={Scroll} onDelete={() => onDeleteRequest(doc)} />
             ))}
             {references.length > 0 && (
-              <div className="px-3 pt-1.5 pb-0.5">
-                <p className="text-xs font-bold text-blue-400/80 uppercase tracking-wider flex items-center gap-1">
-                  <BookOpen className="w-3 h-3" /> 자료
+              <div className="px-3 py-1 bg-muted/30 sticky top-0 z-10">
+                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                  <BookOpen className="w-3 h-3" /> 자료 ({references.length})
                 </p>
               </div>
             )}
@@ -303,7 +305,7 @@ function AssistantDocContent({
             ))}
           </div>
         )}
-      </div>
+      </ScrollArea>
     </div>
   );
 }
@@ -318,7 +320,7 @@ function DocItem({
   onDelete: () => void;
 }) {
   return (
-    <div className="px-3 py-2 hover:bg-muted/50 group flex items-center justify-between gap-2">
+    <div className="px-3 py-1.5 hover:bg-muted/50 group flex items-center justify-between gap-2">
       <div className="flex-1 min-w-0">
         <p className="text-sm text-foreground truncate flex items-center gap-1.5">
           <Icon className="w-3.5 h-3.5 shrink-0" />
@@ -327,7 +329,7 @@ function DocItem({
       </div>
       <button
         onClick={onDelete}
-        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-400 hover:bg-red-500/10 p-1 rounded transition-all"
+        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive hover:bg-destructive/10 p-1 rounded transition-all"
       >
         <Trash2 className="w-3.5 h-3.5" />
       </button>

@@ -92,7 +92,7 @@ export function ConversationList({
                       e.stopPropagation();
                       setConfirmId(conv.id);
                     }}
-                    className="text-red-400/60 hover:text-red-400 hover:bg-red-500/15 p-1 rounded transition-all shrink-0 flex-none"
+                    className="text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10 p-1 rounded transition-all shrink-0 flex-none"
                     title="대화 삭제"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -103,7 +103,7 @@ export function ConversationList({
                     {formatRelativeDate(conv.updated_at)}
                   </span>
                   {conv.assistant_name && (
-                    <Badge variant="secondary" className="text-xs px-1.5 py-0 h-4 bg-purple-500/15 text-purple-400 border-0">
+                    <Badge variant="secondary" className="text-xs px-1.5 py-0 h-4 bg-accent text-accent-foreground border-0">
                       <Bot className="w-2.5 h-2.5 mr-0.5" />
                       {conv.assistant_name}
                     </Badge>

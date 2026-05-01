@@ -10,29 +10,27 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 );
 
-const APP_ID = process.env.APP_ID || 'genie_assistant';
-
-// pgvector 유사도 검색
+// ────────────────────── pgvector 유사도 검색 ──────────────────────
 async function searchByVector(
   query: string,
   assistantId?: string | null,
   docTypeFilter?: 'script' | 'reference' | 'all' | null,
-  matchCount: number = 10
+  matchCount: number = 10,
+  sourceFile?: string | null          // ★ Phase 3: 특정 파일만 검색
 ): Promise<string> {
-  console.log(`[RAG] 벡터 검색 시작 | 쿼리: "${query}" | 보조작가: ${assistantId || '없음'} | 필터: ${docTypeFilter || 'all'} | 검색수: ${matchCount} | 앱: ${APP_ID}`);
+  console.log(`[RAG] 벡터 검색 시작 | 쿼리: "${query.substring(0, 50)}" | 보조작가: ${assistantId || '없음'} | 필터: ${docTypeFilter || 'all'} | 파일: ${sourceFile || '전체'} | 검색수: ${matchCount}`);
 
   try {
-    // 질문을 임베딩
     const queryEmbedding = await generateEmbedding(query);
 
     // 레벨1 검색 (공유 지식 — assistant_id가 NULL인 문서)
     const { data: level1Results, error: l1Err } = await supabase.rpc('match_documents', {
       query_embedding: JSON.stringify(queryEmbedding),
-      match_threshold: 0.2,
+      match_threshold: 0.35,           // ★ Phase 3: 0.2 → 0.35
       match_count: matchCount,
       filter_assistant_id: null,
       filter_doc_type: (docTypeFilter && docTypeFilter !== 'all') ? docTypeFilter : null,
-      filter_app_id: APP_ID,
+      filter_source_file: sourceFile || null,  // ★ Phase 2: source_file 필터
     });
 
     if (l1Err) console.error('[RAG] 레벨1 검색 오류:', l1Err.message);
@@ -42,7 +40,6 @@ async function searchByVector(
     let level2Results: any[] = [];
     let assistantName = '';
     if (assistantId) {
-      // 보조작가 이름 조회
       const { data: assistant } = await supabase
         .from('assistants')
         .select('name')
@@ -52,11 +49,11 @@ async function searchByVector(
 
       const { data: l2Data, error: l2Err } = await supabase.rpc('match_documents', {
         query_embedding: JSON.stringify(queryEmbedding),
-        match_threshold: 0.2,
+        match_threshold: 0.35,         // ★ Phase 3: 0.2 → 0.35
         match_count: matchCount,
         filter_assistant_id: assistantId,
         filter_doc_type: (docTypeFilter && docTypeFilter !== 'all') ? docTypeFilter : null,
-        filter_app_id: APP_ID,
+        filter_source_file: sourceFile || null,  // ★ Phase 2: source_file 필터
       });
 
       if (l2Err) console.error('[RAG] 레벨2 검색 오류:', l2Err.message);
@@ -83,17 +80,13 @@ async function searchByVector(
 
   } catch (err: any) {
     console.error('[RAG] 벡터 검색 실패:', err.message);
-
     return '';
   }
 }
 
-export const maxDuration = 300; // 대본 비교 등 대용량 처리용
+export const maxDuration = 300;
 
-/**
- * 특정 source_file의 전체 청크를 순서대로 복원하여 풀텍스트 반환
- * - assistantId 지정 시: 해당 보조작가 문서 우선 → 없으면 공유 문서에서 검색
- */
+// ────────────────────── 풀텍스트 복원 ──────────────────────
 async function getFullDocumentText(sourceFile: string, assistantId?: string | null): Promise<string> {
   // 1차: assistantId 지정 시 보조작가 문서에서 검색
   if (assistantId) {
@@ -102,7 +95,7 @@ async function getFullDocumentText(sourceFile: string, assistantId?: string | nu
       .select('content')
       .eq('source_file', sourceFile)
       .eq('assistant_id', assistantId)
-      .eq('app_id', APP_ID)
+      // ★ Phase 5: .eq('app_id', APP_ID) 제거
       .order('id', { ascending: true });
 
     if (!error && data && data.length > 0) {
@@ -117,7 +110,7 @@ async function getFullDocumentText(sourceFile: string, assistantId?: string | nu
     .select('content')
     .eq('source_file', sourceFile)
     .is('assistant_id', null)
-    .eq('app_id', APP_ID)
+    // ★ Phase 5: .eq('app_id', APP_ID) 제거
     .order('id', { ascending: true });
 
   if (error) {
@@ -130,23 +123,39 @@ async function getFullDocumentText(sourceFile: string, assistantId?: string | nu
   return data.map(d => d.content).join('\n');
 }
 
-/**
- * 업로드된 문서 목록 조회 (보조작가/공유 구분)
- * - assistantId 지정 시: 보조작가 문서와 공유 문서를 분리하여 반환
- */
-async function listUploadedDocuments(assistantId?: string | null): Promise<{ assistantFiles: string[]; sharedFiles: string[] }> {
+// ────────────────────── 문서 목록 조회 ──────────────────────
+async function listUploadedDocuments(assistantId?: string | null): Promise<{
+  assistantFiles: string[];
+  sharedFiles: string[];
+  assistantScripts: string[];
+  assistantReferences: string[];
+}> {
   const assistantFiles: string[] = [];
+  const assistantScripts: string[] = [];
+  const assistantReferences: string[] = [];
   const sharedFiles: string[] = [];
 
-  // 보조작가 문서
+  // 보조작가 문서 (doc_type 포함 조회)
   if (assistantId) {
     const { data } = await supabase
       .from('documents')
-      .select('source_file')
+      .select('source_file, doc_type')
       .eq('assistant_id', assistantId)
-      .eq('app_id', APP_ID)
+      // ★ Phase 5: .eq('app_id', APP_ID) 제거
       .order('source_file', { ascending: true });
-    if (data) assistantFiles.push(...[...new Set(data.map(d => d.source_file))]);
+    if (data) {
+      const uniqueFiles = new Map<string, string>();
+      for (const d of data) {
+        if (!uniqueFiles.has(d.source_file)) {
+          uniqueFiles.set(d.source_file, d.doc_type);
+        }
+      }
+      for (const [file, docType] of uniqueFiles) {
+        assistantFiles.push(file);
+        if (docType === 'reference') assistantReferences.push(file);
+        else assistantScripts.push(file);
+      }
+    }
   }
 
   // 공유 문서
@@ -154,20 +163,53 @@ async function listUploadedDocuments(assistantId?: string | null): Promise<{ ass
     .from('documents')
     .select('source_file')
     .is('assistant_id', null)
-    .eq('app_id', APP_ID)
+    // ★ Phase 5: .eq('app_id', APP_ID) 제거
     .order('source_file', { ascending: true });
   if (sharedData) sharedFiles.push(...[...new Set(sharedData.map(d => d.source_file))]);
 
-  return { assistantFiles, sharedFiles };
+  return { assistantFiles, sharedFiles, assistantScripts, assistantReferences };
 }
 
+// ────────────────────── 지정 파일만 풀텍스트 로드 (헬퍼) ──────────────────────
+async function loadSpecificFiles(
+  files: string[],
+  assistantId?: string | null,
+  assistantFiles?: string[],
+  sharedFiles?: string[]
+): Promise<{ name: string; text: string }[]> {
+  const results: { name: string; text: string }[] = [];
+  for (const fileName of files) {
+    // 보조작가 문서 → 공유 문서 순으로 시도
+    const text = await getFullDocumentText(fileName, assistantId);
+    if (text) {
+      results.push({ name: fileName, text });
+    } else {
+      // 파일명이 정확하지 않을 수 있으므로 부분 매칭 시도
+      const allPool = [...(assistantFiles || []), ...(sharedFiles || [])];
+      const fuzzyMatch = allPool.find(f =>
+        f.toLowerCase().includes(fileName.toLowerCase()) ||
+        fileName.toLowerCase().includes(f.replace(/\.[^.]+$/, '').toLowerCase())
+      );
+      if (fuzzyMatch && fuzzyMatch !== fileName) {
+        const matchedText = await getFullDocumentText(fuzzyMatch, assistantId);
+        if (matchedText) {
+          console.log(`[FullText] 부분 매칭: "${fileName}" → "${fuzzyMatch}"`);
+          results.push({ name: fuzzyMatch, text: matchedText });
+        }
+      }
+    }
+  }
+  return results;
+}
+
+// ══════════════════════ POST 핸들러 ══════════════════════
 export async function POST(req: Request) {
   const { messages, assistantId } = await req.json();
 
   // 1. 사용자 마지막 메시지를 추출
   const rawLastMessage = messages.filter((m: any) => m.role === 'user').pop()?.content || '';
 
-  // 첨부 파일 텍스트 분리: 인텐트 라우터에는 질문만, Gemini에는 전체 전달
+  // 첨부 파일 텍스트 분리
   const attachmentMarker = '\n\n---\n[첨부 파일: ';
   const hasAttachment = rawLastMessage.includes(attachmentMarker);
   const lastUserMessage = hasAttachment
@@ -188,76 +230,105 @@ export async function POST(req: Request) {
     assistantInfo = data;
   }
 
-  // 2. 인텐트(Intent) 라우팅 — 대본/자료 분석 분리
-  const routerModel = genAI.getGenerativeModel({ 
+  // ────────── 2. 인텐트 라우팅 (★ Phase 1: 고도화) ──────────
+  const routerModel = genAI.getGenerativeModel({
     model: 'gemini-2.5-flash',
     generationConfig: { responseMimeType: "application/json" }
   });
 
-  // 업로드된 문서 목록 조회 (비교 인텐트 판별용)
-  const { assistantFiles, sharedFiles } = await listUploadedDocuments(assistantId);
+  const { assistantFiles, sharedFiles, assistantScripts, assistantReferences } = await listUploadedDocuments(assistantId);
   const allFiles = [...assistantFiles, ...sharedFiles];
+
+  // ★ Phase 1: 문서 목록을 카테고리별로 구분하여 제공
   let fileListStr = '';
   if (assistantId && assistantFiles.length > 0) {
-    // ★ 보조작가 활성 시: 보조작가 전용 문서만 표시 (공유 문서 제외하여 잘못된 선택 방지)
-    fileListStr = assistantFiles.join(', ');
+    const parts = [];
+    if (assistantScripts.length > 0) parts.push(`[보조작가 대본] ${assistantScripts.join(', ')}`);
+    if (assistantReferences.length > 0) parts.push(`[보조작가 자료] ${assistantReferences.join(', ')}`);
+    if (sharedFiles.length > 0) parts.push(`[공유 자료] ${sharedFiles.join(', ')}`);
+    fileListStr = parts.join('\n  ');
   } else {
-    fileListStr = allFiles.length > 0 ? allFiles.join(', ') : '없음';
+    fileListStr = allFiles.length > 0 ? `[공유 자료] ${allFiles.join(', ')}` : '없음';
   }
 
+  // ★ Phase 1: 개선된 라우터 프롬프트 — files + scope 추출
   const routerPrompt = `
-  다음 사용자 메시지를 분석하여 7가지 카테고리 중 하나로 분류하세요.
-  1. "conversation": 단순한 인사, 일상 대화, 격려 요청, 날씨 등 일반적인 잡담.
-  2. "search": 특정 정보를 묻는 질문, 업로드된 문서에 대한 일반적 질문, 지식이나 자료를 검색해야 하는 질문.
-  3. "analyze_script": 대본(시나리오/각본/스크립트) 하나에 대한 분석 요청. 예: 미드포인트 분석, 캐릭터 아크, 플롯 구조, 서사 흐름.
-  4. "analyze_reference": 참고자료에 대한 분석, 요약, 정리 요청.
-  5. "analyze": 사용자가 직접 작성한 새 캐릭터 설정/대본 초안/플롯을 메시지에 포함하여 평가/피드백을 요청하는 경우.
-  6. "compare_scripts": 두 개 이상의 대본/버전을 비교하는 요청. 예: "V4.8과 V4.9 차이점", "1부와 2부 비교", "두 대본의 달라진 점", "버전 차이 분석" 등.
-  7. "analyze_attachment": 사용자가 채팅에서 파일을 직접 첨부하여 질문하는 경우. 첨부 파일이 있다는 표시가 있으면 이 인텐트를 선택하세요.
+  다음 사용자 메시지를 분석하여 인텐트(intent), 대상 파일(files), 검색 범위(scope)를 판별하세요.
 
-  중요 판별 규칙:
-  ${hasAttachment ? '- ⚠️ 사용자가 파일을 채팅에 직접 첨부했습니다 → "analyze_attachment"를 우선 선택하세요.' : ''}
-  - "비교", "차이점", "달라진", "변경사항", "수정사항", "vs", "VS", "대비", "비교해" 키워드 → "compare_scripts"
-  - 두 버전/문서를 언급하며 비교를 요청하면 → "compare_scripts"
-  - 단일 대본 분석(비교 아님) → "analyze_script"
-  - "자료", "논문", "배경" 키워드 → "analyze_reference"
+  ## 인텐트 분류 (7가지)
+  1. "conversation": 단순 인사, 일상 대화, 격려 요청, 잡담.
+  2. "search": 정보 검색, 업로드 문서에 대한 질문, 지식 검색.
+  3. "analyze_script": 대본/시나리오 분석 (미드포인트, 캐릭터 아크, 플롯 구조 등).
+  4. "analyze_reference": 참고자료 분석, 요약, 정리.
+  5. "analyze": 사용자가 직접 작성한 텍스트의 평가/피드백.
+  6. "compare_scripts": 두 개 이상 대본/버전 비교.
+  7. "analyze_attachment": 채팅에 파일 직접 첨부 후 질문.
+
+  ## 판별 규칙
+  ${hasAttachment ? '- ⚠️ 파일이 채팅에 직접 첨부됨 → "analyze_attachment" 우선.' : ''}
+  - "비교", "차이점", "달라진", "vs", "비교해" → "compare_scripts"
+  - 단일 대본 분석 → "analyze_script"
+  - "자료", "논문", "레퍼런스" → "analyze_reference"
   - 사용자가 직접 작성한 텍스트 평가 → "analyze"
-  
-  현재 업로드된 문서 목록:
+
+  ## 파일명 추출 규칙 (★ 중요)
+  사용자가 특정 파일명을 언급하면 files 배열에 포함하세요.
+  - 확장자가 있으면: 정확히 매칭 (예: "시나리오_구조론.pdf" → ["시나리오_구조론.pdf"])
+  - 확장자 없이 줄여 부르면: 문서 목록에서 가장 유사한 파일명 매칭 (예: "구조론" → ["시나리오_구조론.pdf"])
+  - 파일명 미언급 시: files를 빈 배열([])로
+
+  ## 검색 범위(scope) 판별 규칙
+  - "공유 자료에서", "공유 문서" → "shared"
+  - "전용 자료", "보조작가 자료" → "assistant"
+  - "대본에서", "대본 기반", "스크립트에서" → "script"
+  - "자료에서", "레퍼런스에서", "참고자료" → "reference"
+  - 특정 파일명 지정 시 → "file"
+  - 범위 미지정 → "all"
+
+  ## 현재 업로드된 문서 목록
   ${fileListStr}
-  
-  compare_scripts인 경우 비교할 파일명도 함께 반환하세요.
-  ${assistantId ? '중요: 보조작가가 활성화 상태입니다. 반드시 [보조작가 전용 문서] 목록에서 파일을 선택하세요. [공유 문서]에서는 선택하지 마세요.' : ''}
-  응답 형식은 반드시 다음과 같은 JSON 포맷이어야 합니다:
-  {"intent": "...", "files": ["file1.pdf", "file2.pdf"]}
-  files는 compare_scripts일 때만 필수이며, 위 문서 목록에서 가장 유사한 파일명을 선택하세요.
-  다른 인텐트에서는 files를 빈 배열([])로 반환하세요.
-  
+
+  ${assistantId ? '주의: 보조작가가 활성화 상태입니다. 파일 선택 시 보조작가 전용 문서를 우선하세요.' : ''}
+
+  ## 응답 형식 (JSON)
+  {"intent": "...", "files": ["file1.pdf"], "scope": "file"}
+
   사용자 메시지: "${lastUserMessage}"
   `;
 
   let intent = "conversation";
-  let compareFiles: string[] = [];
+  let targetFiles: string[] = [];
+  let scope = "all";
+
   try {
     const routerResult = await routerModel.generateContent(routerPrompt);
     const routerResponseText = routerResult.response.text();
-    const parsedIntent = JSON.parse(routerResponseText);
-    if (["conversation", "search", "analyze_script", "analyze_reference", "analyze", "compare_scripts", "analyze_attachment"].includes(parsedIntent.intent)) {
-      intent = parsedIntent.intent;
+    const parsed = JSON.parse(routerResponseText);
+
+    if (["conversation", "search", "analyze_script", "analyze_reference", "analyze", "compare_scripts", "analyze_attachment"].includes(parsed.intent)) {
+      intent = parsed.intent;
     }
-    if (parsedIntent.files && Array.isArray(parsedIntent.files)) {
-      compareFiles = parsedIntent.files;
+    if (parsed.files && Array.isArray(parsed.files)) {
+      targetFiles = parsed.files;
+    }
+    if (parsed.scope && ["all", "shared", "assistant", "script", "reference", "file"].includes(parsed.scope)) {
+      scope = parsed.scope;
+    }
+    // 파일 지정인데 scope가 all이면 file로 보정
+    if (targetFiles.length > 0 && scope === 'all') {
+      scope = 'file';
     }
     if (hasAttachment && intent !== 'analyze_attachment') {
       intent = 'analyze_attachment';
     }
-    console.log("[Intent Router] Classified as:", intent, compareFiles.length > 0 ? `| 비교 파일: ${compareFiles}` : '', hasAttachment ? '| 첨부파일 있음' : '');
+
+    console.log(`[Intent Router] intent: ${intent} | files: [${targetFiles.join(', ')}] | scope: ${scope}${hasAttachment ? ' | 첨부파일 있음' : ''}`);
   } catch (error) {
     console.error("[Intent Router] Classification failed, fallback to search", error);
     intent = hasAttachment ? "analyze_attachment" : "search";
   }
 
-  // 3. 보조작가 페르소나 기반 시스템 프롬프트 구성
+  // ────────── 3. 시스템 프롬프트 구성 ──────────
   const assistantName = assistantInfo?.name || '블랙위도우';
   const assistantPersona = assistantInfo?.persona || '';
   const assistantSpecialty = assistantInfo?.specialty || '';
@@ -287,35 +358,82 @@ export async function POST(req: Request) {
   let targetModelName = 'gemini-2.5-flash';
   let systemPrompt = '';
 
-  switch (intent) {
-    case 'compare_scripts': {
-      // 대본 비교: 전체 텍스트 복원 후 비교 (RAG 미사용)
-      console.log(`[Compare] 대본 비교 시작 | 파일: ${compareFiles.join(', ')}`);
-      console.log(`[Compare] 🔍 assistantId: ${assistantId || '없음'} | 보조작가 문서: [${assistantFiles.join(', ')}] | 공유 문서: [${sharedFiles.join(', ')}]`);
+  // ★ Phase 4: scope/files 기반 컨텍스트 로딩 헬퍼
+  // 특정 파일 풀텍스트 로드 vs 전체 로드를 공통 패턴으로 추출
+  async function loadContextByScope(
+    docTypeHint?: 'script' | 'reference'
+  ): Promise<{ fullTexts: { name: string; text: string }[]; ragContext: string }> {
+    let fullTexts: { name: string; text: string }[] = [];
 
-      // ★ 보조작가 활성 시: 인텐트 라우터가 선택한 파일이 보조작가 문서인지 검증
-      let validatedFiles = compareFiles;
+    // (A) 특정 파일 지정 → 해당 파일만 로드
+    if (scope === 'file' && targetFiles.length > 0) {
+      fullTexts = await loadSpecificFiles(targetFiles, assistantId, assistantFiles, sharedFiles);
+    }
+    // (B) 카테고리 지정 → 해당 카테고리 파일만 로드
+    else if (scope === 'script') {
+      const pool = assistantId && assistantScripts.length > 0 ? assistantScripts : allFiles;
+      for (const f of pool) {
+        const text = await getFullDocumentText(f, assistantId);
+        if (text) fullTexts.push({ name: f, text });
+      }
+    } else if (scope === 'reference') {
+      const pool = assistantId && assistantReferences.length > 0 ? assistantReferences : sharedFiles;
+      for (const f of pool) {
+        const text = await getFullDocumentText(f, assistantId);
+        if (text) fullTexts.push({ name: f, text });
+      }
+    } else if (scope === 'shared') {
+      for (const f of sharedFiles) {
+        const text = await getFullDocumentText(f, null);
+        if (text) fullTexts.push({ name: f, text });
+      }
+    } else if (scope === 'assistant') {
+      for (const f of assistantFiles) {
+        const text = await getFullDocumentText(f, assistantId);
+        if (text) fullTexts.push({ name: f, text });
+      }
+    }
+    // (C) 범위 미지정(all) → 기존 로직: docTypeHint 또는 전체
+    else {
+      const pool = assistantId && assistantFiles.length > 0
+        ? (docTypeHint === 'reference' ? assistantReferences : (docTypeHint === 'script' ? assistantScripts : assistantFiles))
+        : allFiles;
+      for (const f of pool) {
+        const text = await getFullDocumentText(f, assistantId);
+        if (text) fullTexts.push({ name: f, text });
+      }
+    }
+
+    // 보조 RAG 검색 (풀텍스트 로드한 파일과 다른 소스에서)
+    const ragContext = await searchByVector(lastUserMessage, null, 'all', 5);
+
+    return { fullTexts, ragContext };
+  }
+
+  switch (intent) {
+    // ═══════════════ compare_scripts ═══════════════
+    case 'compare_scripts': {
+      console.log(`[Compare] 대본 비교 시작 | 파일: ${targetFiles.join(', ')}`);
+
+      // 보조작가 활성 시: 보조작가 문서인지 검증
+      let validatedFiles = targetFiles;
       if (assistantId && assistantFiles.length > 0) {
-        validatedFiles = compareFiles.filter(f => assistantFiles.includes(f));
-        if (validatedFiles.length < compareFiles.length) {
-          console.log(`[Compare] ⚠️ 보조작가 문서 필터링: ${compareFiles.join(', ')} → ${validatedFiles.join(', ') || '없음'} (공유 문서 제외)`);
+        validatedFiles = targetFiles.filter(f => assistantFiles.includes(f));
+        if (validatedFiles.length < targetFiles.length) {
+          console.log(`[Compare] ⚠️ 보조작가 문서 필터링: ${targetFiles.join(', ')} → ${validatedFiles.join(', ') || '없음'}`);
         }
       }
 
       let fullTexts: { name: string; text: string }[] = [];
 
       if (validatedFiles.length >= 2) {
-        // 검증된 파일명으로 비교
-        for (const fileName of validatedFiles.slice(0, 2)) {
-          const text = await getFullDocumentText(fileName, assistantId);
-          if (text) fullTexts.push({ name: fileName, text });
-        }
+        fullTexts = await loadSpecificFiles(validatedFiles.slice(0, 2), assistantId, assistantFiles, sharedFiles);
       }
 
-      // 파일이 부족하면 보조작가 문서에서 우선 자동 선택
+      // 파일 부족 시 자동 선택
       if (fullTexts.length < 2) {
         const searchPool = assistantId && assistantFiles.length >= 2 ? assistantFiles : allFiles;
-        console.log(`[Compare] 파일 자동 탐색... ${assistantId && assistantFiles.length >= 2 ? '보조작가 전용' : '전체'} 목록에서 선택`);
+        console.log(`[Compare] 파일 자동 탐색... ${assistantId && assistantFiles.length >= 2 ? '보조작가 전용' : '전체'} 목록`);
         fullTexts = [];
         for (const fileName of searchPool.slice(0, 2)) {
           const text = await getFullDocumentText(fileName, assistantId);
@@ -357,32 +475,20 @@ export async function POST(req: Request) {
         ## 📄 대본 B: ${fullTexts[1].name}
         ${fullTexts[1].text}`;
       }
-
-      targetModelName = 'gemini-2.5-flash'; // 대용량 컨텍스트 지원
       break;
     }
 
+    // ═══════════════ analyze_script ═══════════════
     case 'analyze_script': {
-      // 대본 분석: 전체 텍스트 복원 (RAG 부분 검색 대신 전체 대본 사용)
-      let scriptFullTexts: { name: string; text: string }[] = [];
-      
-      // 보조작가 대본 전체 복원
-      const scriptPool = assistantId && assistantFiles.length > 0 ? assistantFiles : allFiles.filter(f => !f.includes('reference'));
-      for (const fileName of scriptPool) {
-        const text = await getFullDocumentText(fileName, assistantId);
-        if (text) scriptFullTexts.push({ name: fileName, text });
-      }
+      // ★ Phase 4: 파일 지정 시 해당 파일만 로드
+      const { fullTexts: scriptFullTexts, ragContext: sharedScriptContext } = await loadContextByScope('script');
 
       if (scriptFullTexts.length > 0) {
-        // 전체 대본 텍스트를 시스템 프롬프트에 포함
         const allScriptText = scriptFullTexts
           .map(s => `=== 📜 ${s.name} (${s.text.length}자) ===\n${s.text}`)
           .join('\n\n---\n\n');
 
-        // 공유 자료 RAG 보조 검색
-        const sharedScriptContext = await searchByVector(lastUserMessage, null, 'all', 5);
-
-        console.log(`[Analyze Script] 전체 대본 ${scriptFullTexts.length}개 로드 (총 ${allScriptText.length}자) + 공유 RAG ${sharedScriptContext ? '있음' : '없음'}`);
+        console.log(`[Analyze Script] ${scope === 'file' ? '지정 파일' : '전체'} 대본 ${scriptFullTexts.length}개 로드 (총 ${allScriptText.length}자)`);
 
         systemPrompt = `${basePersona}
         당신은 대본/시나리오 전문 분석가입니다.
@@ -406,7 +512,7 @@ export async function POST(req: Request) {
         [공유 참고 자료]
         ${sharedScriptContext || '없음'}`;
       } else {
-        // 대본이 없는 경우 RAG 폴백
+        // 대본 없으면 RAG 폴백
         const scriptContext = await searchByVector(lastUserMessage, assistantId, 'script', 20);
         systemPrompt = `${basePersona}
         사용자가 대본 분석을 요청했지만, 업로드된 대본을 찾을 수 없습니다.
@@ -415,49 +521,29 @@ export async function POST(req: Request) {
         [참고 자료]
         ${scriptContext || '검색 결과 없음'}`;
       }
-
-      targetModelName = 'gemini-2.5-flash'; // 대용량 컨텍스트 지원 (1M 토큰)
       break;
     }
 
+    // ═══════════════ analyze_reference ═══════════════
     case 'analyze_reference': {
-      // 자료 분석: 전체 텍스트 복원
-      let refFullTexts: { name: string; text: string }[] = [];
-      
-      // 참고자료 파일 목록 (assistant 문서 중 reference 타입 또는 공유 문서)
-      if (assistantId) {
-        // 보조작가의 reference 문서 조회
-        const { data: refDocs } = await supabase
-          .from('documents')
-          .select('source_file')
-          .eq('assistant_id', assistantId)
-          .eq('doc_type', 'reference')
-          .eq('app_id', APP_ID);
-        const refFiles = [...new Set((refDocs || []).map(d => d.source_file))];
-        
-        for (const fileName of refFiles) {
-          const text = await getFullDocumentText(fileName, assistantId);
-          if (text) refFullTexts.push({ name: fileName, text });
-        }
-      }
-      
-      // 공유 문서도 포함
-      if (refFullTexts.length === 0) {
+      // ★ Phase 4: 파일 지정 시 해당 파일만 로드
+      const { fullTexts: refFullTexts, ragContext: sharedRefContext } = await loadContextByScope('reference');
+
+      // 폴백: reference가 없으면 공유 파일에서
+      let finalRefTexts = refFullTexts;
+      if (finalRefTexts.length === 0 && scope === 'all') {
         for (const fileName of sharedFiles.slice(0, 5)) {
           const text = await getFullDocumentText(fileName, null);
-          if (text) refFullTexts.push({ name: fileName, text });
+          if (text) finalRefTexts.push({ name: fileName, text });
         }
       }
 
-      if (refFullTexts.length > 0) {
-        const allRefText = refFullTexts
+      if (finalRefTexts.length > 0) {
+        const allRefText = finalRefTexts
           .map(s => `=== 📚 ${s.name} (${s.text.length}자) ===\n${s.text}`)
           .join('\n\n---\n\n');
 
-        // 공유 자료 RAG 보조 검색
-        const sharedRefContext = await searchByVector(lastUserMessage, null, 'all', 5);
-
-        console.log(`[Analyze Ref] 전체 자료 ${refFullTexts.length}개 로드 (총 ${allRefText.length}자) + 공유 RAG ${sharedRefContext ? '있음' : '없음'}`);
+        console.log(`[Analyze Ref] ${scope === 'file' ? '지정 파일' : '전체'} 자료 ${finalRefTexts.length}개 로드 (총 ${allRefText.length}자)`);
 
         systemPrompt = `${basePersona}
         사용자가 업로드한 참고자료를 기반으로 답변하세요.
@@ -486,13 +572,11 @@ export async function POST(req: Request) {
         [참고 자료]
         ${refContext || '검색 결과 없음'}`;
       }
-
-      targetModelName = 'gemini-2.5-flash';
       break;
     }
 
+    // ═══════════════ analyze_attachment ═══════════════
     case 'analyze_attachment': {
-      // 채팅에서 직접 첨부된 파일 분석 + 보조작가 대본 전체 로드 + 공유 RAG
       let attAssistantContext = '';
       if (assistantId && assistantFiles.length > 0) {
         const scriptFullTexts: { name: string; text: string }[] = [];
@@ -509,7 +593,7 @@ export async function POST(req: Request) {
 
       const sharedAttContext = await searchByVector(lastUserMessage, null, 'all', 5);
 
-      console.log(`[Analyze Attachment] 첨부 파일 분석 | 질문: "${lastUserMessage.substring(0, 50)}..." | 첨부 텍스트 길이: ${attachmentText.length}자 | 전용 대본: ${attAssistantContext ? `${attAssistantContext.length}자` : '없음'} | 공유 RAG: ${sharedAttContext ? '있음' : '없음'}`);
+      console.log(`[Analyze Attachment] 첨부 파일 분석 | 질문: "${lastUserMessage.substring(0, 50)}..." | 첨부 텍스트: ${attachmentText.length}자 | 전용 대본: ${attAssistantContext ? `${attAssistantContext.length}자` : '없음'}`);
 
       systemPrompt = `${basePersona}
       사용자가 채팅에서 직접 파일을 첨부하여 질문했습니다.
@@ -532,11 +616,10 @@ export async function POST(req: Request) {
 
       [공유 참고 자료]
       ${sharedAttContext || '없음'}`;
-
-      targetModelName = 'gemini-2.5-flash';
       break;
     }
 
+    // ═══════════════ analyze (사용자 작성 텍스트) ═══════════════
     case 'analyze': {
       const sharedAnalyzeContext = await searchByVector(lastUserMessage, null, 'all', 5);
 
@@ -550,11 +633,43 @@ export async function POST(req: Request) {
       break;
     }
 
+    // ═══════════════ search ═══════════════
     case 'search': {
-      // 보조작가 활성 시: 전용 대본 전체 로드 + 공유 자료 RAG 보조
+      // ★ Phase 4: scope/files에 따라 선택적 로드
+      if (scope === 'file' && targetFiles.length > 0) {
+        // (A) 특정 파일 지정 → 해당 파일만 풀텍스트
+        const specificTexts = await loadSpecificFiles(targetFiles, assistantId, assistantFiles, sharedFiles);
+        if (specificTexts.length > 0) {
+          const fileText = specificTexts
+            .map(s => `=== 📜 ${s.name} ===\n${s.text}`)
+            .join('\n\n---\n\n');
+          const supplementary = await searchByVector(lastUserMessage, null, 'all', 5);
+
+          console.log(`[Search] 지정 파일 ${specificTexts.length}개 로드 (${specificTexts.map(s => s.name).join(', ')})`);
+
+          systemPrompt = `${basePersona}
+          사용자가 특정 파일을 지정하여 질문했습니다.
+          아래 제공된 파일의 전체 내용을 바탕으로 정확하게 답변하세요.
+          파일에 없는 내용이라면 그 사실을 명확히 밝히세요.
+
+          [지정 파일]
+          ${fileText}
+
+          [보조 참고 자료]
+          ${supplementary || '없음'}`;
+          break;
+        }
+      }
+
+      // (B) 보조작가 활성 + 문서 있음 → 전체 로드 (기존 로직)
       if (assistantId && assistantFiles.length > 0) {
+        // scope에 따라 로드 대상 결정
+        let pool = assistantFiles;
+        if (scope === 'script') pool = assistantScripts;
+        else if (scope === 'reference') pool = assistantReferences;
+
         const scriptFullTexts: { name: string; text: string }[] = [];
-        for (const fileName of assistantFiles) {
+        for (const fileName of pool) {
           const text = await getFullDocumentText(fileName, assistantId);
           if (text) scriptFullTexts.push({ name: fileName, text });
         }
@@ -564,10 +679,9 @@ export async function POST(req: Request) {
             .map(s => `=== 📜 ${s.name} ===\n${s.text}`)
             .join('\n\n---\n\n');
 
-          // 공유 자료 RAG 보조 검색
           const sharedContext = await searchByVector(lastUserMessage, null, 'all', 5);
 
-          console.log(`[Search+FullText] 전용 대본 ${scriptFullTexts.length}개 로드 (총 ${allScriptText.length}자) + 공유 RAG ${sharedContext ? '있음' : '없음'}`);
+          console.log(`[Search+FullText] 전용 ${scope !== 'all' ? `(${scope})` : ''} ${scriptFullTexts.length}개 로드 (총 ${allScriptText.length}자)`);
 
           systemPrompt = `${basePersona}
           당신은 아래 제공된 전용 대본/자료의 전체 내용을 완벽히 숙지하고 있습니다.
@@ -585,8 +699,10 @@ export async function POST(req: Request) {
         }
       }
 
-      // 보조작가 비활성 또는 문서 없음: 기존 벡터 검색
-      const retrievedContext = await searchByVector(lastUserMessage, assistantId, 'all', 10);
+      // (C) 보조작가 비활성 또는 문서 없음 → 벡터 검색
+      const sourceFileFilter = scope === 'file' && targetFiles.length > 0 ? targetFiles[0] : null;
+      const docTypeForSearch = scope === 'script' ? 'script' : scope === 'reference' ? 'reference' : 'all';
+      const retrievedContext = await searchByVector(lastUserMessage, assistantId, docTypeForSearch as any, 10, sourceFileFilter);
 
       systemPrompt = `${basePersona}
       사용자의 질문에 대해 하단의 [참고 자료]를 바탕으로 정확히 답변해주세요.
@@ -598,33 +714,25 @@ export async function POST(req: Request) {
       break;
     }
 
+    // ═══════════════ conversation ═══════════════
     case 'conversation':
     default: {
+      // ★ Phase 4: conversation에서는 벡터 검색만 (풀텍스트 로드 불필요)
       let conversationContext = '';
-      let sharedConvContext = '';
-      if (assistantId && assistantFiles.length > 0) {
-        const scriptFullTexts: { name: string; text: string }[] = [];
-        for (const fileName of assistantFiles) {
-          const text = await getFullDocumentText(fileName, assistantId);
-          if (text) scriptFullTexts.push({ name: fileName, text });
-        }
-        if (scriptFullTexts.length > 0) {
-          conversationContext = scriptFullTexts
-            .map(s => `=== 📜 ${s.name} ===\n${s.text}`)
-            .join('\n\n---\n\n');
-        }
-        sharedConvContext = await searchByVector(lastUserMessage, null, 'all', 5);
+      if (assistantId) {
+        conversationContext = await searchByVector(lastUserMessage, assistantId, 'all', 5);
       }
+      const sharedConvContext = await searchByVector(lastUserMessage, null, 'all', 5);
 
       systemPrompt = `${basePersona}
       사용자의 창작 활동에 영감을 주고, 창작의 고통에 깊이 공감하며 응원과 정서적 지지를 제공하세요.
-      ${conversationContext ? `\n당신은 아래 전용 대본/자료의 내용을 숙지하고 있습니다. 대화 중 관련 내용이 나오면 자연스럽게 활용하세요.\n[공유 참고 자료]가 있다면 보조적으로 참고하세요.\n\n[전체 대본/자료]\n${conversationContext}\n\n[공유 참고 자료]\n${sharedConvContext || '없음'}` : ''}`;
+      ${conversationContext || sharedConvContext ? `\n관련 자료가 있다면 자연스럽게 활용하세요.\n\n[참고 자료]\n${conversationContext}\n${sharedConvContext}` : ''}`;
       break;
     }
   }
-  
-  // 4. Gemini startChat() 멀티턴 대화
-  const model = genAI.getGenerativeModel({ 
+
+  // ────────── 4. Gemini 멀티턴 대화 ──────────
+  const model = genAI.getGenerativeModel({
     model: targetModelName,
     systemInstruction: systemPrompt,
   });

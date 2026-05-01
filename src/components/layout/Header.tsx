@@ -38,19 +38,19 @@ export function Header({
       )}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <h1 className="text-xl font-bold text-foreground">Genie Assistant</h1>
-          <span className="text-xs text-muted-foreground/50 font-mono">{APP_VERSION}</span>
+          <h1 className="text-2xl font-serif font-normal text-foreground">Genie Assistant</h1>
+          <span className="text-xs text-muted-foreground font-mono">{APP_VERSION}</span>
         </div>
         {activeAssistant ? (
           <div className="flex items-center gap-2 mt-0.5">
-            <Badge variant="secondary" className="bg-purple-500/20 text-purple-400 border-0">
+            <Badge variant="secondary" className="bg-accent text-accent-foreground border-0">
               <Bot className="w-3 h-3 mr-1" />
               {activeAssistant.name}
             </Badge>
             <span className="text-xs text-muted-foreground">{activeAssistant.specialty}</span>
             <button
               onClick={onDeactivateAssistant}
-              className="text-muted-foreground hover:text-red-400 transition-colors"
+              className="text-muted-foreground hover:text-destructive transition-colors"
             >
               <X className="w-3 h-3" />
             </button>

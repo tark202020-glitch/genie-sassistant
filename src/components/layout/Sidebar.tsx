@@ -54,7 +54,7 @@ export function Sidebar({
         open ? 'w-80' : 'w-0'
       } transition-all duration-300 overflow-hidden border-r border-border flex-shrink-0`}
     >
-      <div className="w-80 h-full flex flex-col bg-muted/20 overflow-hidden">
+      <div className="w-80 h-full flex flex-col bg-card overflow-hidden">
         {/* 닫기 버튼 */}
         <div className="flex justify-end p-1.5 border-b border-border">
           <button

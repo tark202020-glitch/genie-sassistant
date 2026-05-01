@@ -18,6 +18,10 @@ const config = {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ['var(--font-sans)', 'Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        serif: ['var(--font-serif)', 'Lora', 'Georgia', 'Cambria', 'serif'],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -52,6 +56,9 @@ const config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        terracotta: '#d97757',
+        vellum: '#faf9f5',
+        parchment: '#dedcd1',
       },
       borderRadius: {
         lg: "var(--radius)",

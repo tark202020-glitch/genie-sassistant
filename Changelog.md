@@ -1,5 +1,55 @@
 # Genie Assistant Changelog
 
+## [V1.024] - 2026-05-01
+
+### 🔍 RAG 파일 지정 검색 개선
+- **Summary**: 사용자가 특정 파일을 지정(파일명/카테고리/첨부)하여 질문할 때 해당 파일 기반으로만 답변하도록 RAG 시스템 전면 개선
+- **Detail**:
+  - ✅ `src/app/api/chat/route.ts`: 인텐트 라우터에 `files[]` + `scope` 필드 추가 (file/script/reference/shared/assistant/all)
+  - ✅ `src/app/api/chat/route.ts`: `searchByVector()`에 `sourceFile` 파라미터 추가, 유사도 임계값 0.2→0.35
+  - ✅ `src/app/api/chat/route.ts`: `loadSpecificFiles()` 신규 — 파일명 매칭 + 퍼지 폴백
+  - ✅ `src/app/api/chat/route.ts`: `loadContextByScope()` 신규 — scope 기반 중앙화된 컨텍스트 로딩
+  - ✅ `src/app/api/chat/route.ts`: `listUploadedDocuments()` 개선 — 카테고리별 분류 반환
+  - ✅ `src/app/api/chat/route.ts`: `conversation` 인텐트에서 풀텍스트→벡터 검색으로 전환 (토큰 절약)
+  - ✅ `src/app/api/chat/route.ts`: `app_id` 참조 전면 제거 (DB에 컬럼 없음)
+  - ✅ `doc/supabase_migration_vector.sql`: `match_documents` RPC에 `filter_source_file` 파라미터 추가
+  - ⚠️ **Supabase 대시보드에서 `match_documents` RPC 함수 업데이트 필요** (SQL 파일 참조)
+- **Build Time**: 2026-05-01
+
+## [V1.023] - 2026-05-01
+
+### 🌙 랜딩 페이지 다크모드 + 로고 SVG 변환
+- **Summary**: 랜딩 페이지를 CSS 변수 기반 시맨틱 토큰으로 전환하여 다크모드 지원, 로고를 SVG 컴포넌트로 변환
+- **Detail**:
+  - ✅ `src/app/landing/page.tsx`: 30+ 하드코딩 색상 → 시맨틱 토큰 (bg-background, text-foreground, bg-card 등)
+  - ✅ `src/components/shared/PildongLogo.tsx`: 신규 SVG 로고 컴포넌트 (currentColor 기반, 다크모드 자동 적응)
+- **Build Time**: 2026-05-01
+
+## [V1.022] - 2026-05-01
+
+### 🎨 Design Renewal — "Academic Journal on Vellum"
+- **Summary**: 전면 디자인 리뉴얼 — 따뜻한 벨럼(양피지) 톤 라이트 테마 + 세리프 제목 서체 + Terra Cotta 악센트
+- **Detail** :
+  - ✅ `src/app/layout.tsx`: Google Fonts (Inter + Lora) 로드, defaultTheme "dark" → "light" 전환
+  - ✅ `tailwind.config.ts`: fontFamily (sans/serif) 추가, terracotta/vellum/parchment 커스텀 색상
+  - ✅ `src/app/globals.css`: CSS 변수 전면 교체 (Vellum White 배경, Ink Black 텍스트, Parchment 테두리, Terra Cotta 포커스 링), 다크 모드 따뜻한 톤 보완, 마크다운 스타일 전면 리뉴얼 (세리프 제목, Terra Cotta 링크/인용/마커, 따뜻한 코드 블록)
+  - ✅ `src/components/ui/button.tsx`: rounded-md → rounded-lg
+  - ✅ `src/components/ui/card.tsx`: shadow-sm 제거
+  - ✅ `src/components/ui/input.tsx`: rounded-lg, bg-white dark:bg-background
+  - ✅ `src/components/ui/textarea.tsx`: 동일
+  - ✅ `src/components/layout/Header.tsx`: 세리프 제목, bg-accent 배지, hover:text-destructive
+  - ✅ `src/components/layout/Sidebar.tsx`: bg-card 배경
+  - ✅ `src/components/sidebar/DocumentsSection.tsx`: blue/purple/amber/orange 하드코딩 → accent/secondary/terracotta 디자인 시스템 색상
+  - ✅ `src/components/sidebar/AssistantSelector.tsx`: purple/green/blue/amber/rose → terracotta/accent/secondary/destructive
+  - ✅ `src/components/sidebar/ConversationList.tsx`: purple 배지 → accent, red 삭제 → destructive
+  - ✅ `src/components/chat/ChatArea.tsx`: 빈 상태 rounded-lg bg-accent, 세리프 제목
+  - ✅ `src/components/chat/ChatInput.tsx`: rounded-lg 통일, bg-white 입력 배경, focus ring → ring
+  - ✅ `src/components/chat/MessageBubble.tsx`: 어시스턴트 text-muted-foreground → text-foreground
+  - ✅ `src/app/login/page.tsx`: rounded-lg 아이콘, 세리프 제목, text-terracotta 링크
+  - ✅ `src/app/register/page.tsx`: 동일 + 성공 아이콘 text-terracotta
+  - ✅ `src/components/shared/UploadProgress.tsx`: green/blue/red → terracotta/accent-foreground/destructive
+- **Build Time**: 2026-05-01
+
 ## [V1.021] - 2026-05-01
 
 ### 🔄 Build Update

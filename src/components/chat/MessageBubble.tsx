@@ -37,7 +37,7 @@ export function MessageBubble({ message, activeAssistantName }: MessageBubblePro
         className={`max-w-[80%] p-4 rounded-xl ${
           isUser
             ? 'bg-primary text-primary-foreground rounded-tr-none'
-            : 'bg-muted text-muted-foreground rounded-tl-none border border-border'
+            : 'bg-muted text-foreground rounded-tl-none border border-border'
         }`}
       >
         <span className="font-semibold text-xs flex items-center gap-1 mb-1 opacity-70">

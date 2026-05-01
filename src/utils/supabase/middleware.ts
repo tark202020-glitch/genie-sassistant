@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (pathname === '/login' || pathname === '/register' || pathname.startsWith('/api/auth/')) {
+  if (pathname === '/login' || pathname === '/register' || pathname === '/landing' || pathname.startsWith('/api/auth/')) {
     return NextResponse.next();
   }
 

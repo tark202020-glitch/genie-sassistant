@@ -157,7 +157,7 @@ export function ChatInput({
           type="button"
           variant="ghost"
           size="icon"
-          className="h-[52px] w-[52px] shrink-0 rounded-2xl border border-border hover:bg-primary/10 hover:border-primary/30"
+          className="h-[52px] w-[52px] shrink-0 rounded-lg border border-border hover:bg-primary/10 hover:border-primary/30"
           onClick={handleFileSelect}
           disabled={isLoading}
           title="파일 첨부"
@@ -173,7 +173,7 @@ export function ChatInput({
           onChange={handleFileChange}
         />
         <Textarea
-          className="flex-1 min-h-[52px] max-h-[200px] resize-none rounded-2xl px-5 py-3.5 bg-background border-border focus-visible:ring-1 focus-visible:ring-primary shadow-sm"
+          className="flex-1 min-h-[52px] max-h-[200px] resize-none rounded-lg px-5 py-3.5 bg-white dark:bg-background border-border focus-visible:ring-1 focus-visible:ring-ring"
           value={input}
           placeholder={
             activeAssistantName
@@ -189,7 +189,7 @@ export function ChatInput({
           type="submit"
           disabled={!canSubmit}
           size="lg"
-          className="rounded-2xl px-6 h-[52px] shrink-0"
+          className="rounded-lg px-6 h-[52px] shrink-0"
         >
           <SendHorizontal className="w-5 h-5" />
         </Button>

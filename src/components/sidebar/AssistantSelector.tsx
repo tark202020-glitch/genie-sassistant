@@ -84,7 +84,7 @@ export function AssistantSelector({ assistantsHook, savedGraphs }: AssistantSele
               <p className="text-xs text-muted-foreground">공유 학습자료 기반</p>
             </div>
             {!activeAssistantId && (
-              <CheckCircle2 className="w-3.5 h-3.5 text-green-500 shrink-0" />
+              <CheckCircle2 className="w-3.5 h-3.5 text-terracotta shrink-0" />
             )}
           </DropdownMenuItem>
 
@@ -108,14 +108,14 @@ export function AssistantSelector({ assistantsHook, savedGraphs }: AssistantSele
                 </p>
               </div>
               {activeAssistantId === a.id ? (
-                <CheckCircle2 className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                <CheckCircle2 className="w-3.5 h-3.5 text-terracotta shrink-0" />
               ) : (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     setConfirmDelete({ id: a.id, name: a.name });
                   }}
-                  className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-400 p-0.5 rounded transition-all shrink-0"
+                  className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive p-0.5 rounded transition-all shrink-0"
                 >
                   <Trash2 className="w-3 h-3" />
                 </button>
@@ -130,8 +130,8 @@ export function AssistantSelector({ assistantsHook, savedGraphs }: AssistantSele
             className="cursor-pointer"
             onClick={() => setShowCreateForm(true)}
           >
-            <Plus className="w-3.5 h-3.5 mr-2 text-purple-400" />
-            <p className="text-sm text-purple-400 font-medium">새 보조작가 만들기</p>
+            <Plus className="w-3.5 h-3.5 mr-2 text-terracotta" />
+            <p className="text-sm text-terracotta font-medium">새 보조작가 만들기</p>
           </DropdownMenuItem>
 
           {/* 캐릭터 관계도 (활성 보조작가가 있을 때만) */}
@@ -148,7 +148,7 @@ export function AssistantSelector({ assistantsHook, savedGraphs }: AssistantSele
                   rel="noopener noreferrer"
                   className="cursor-pointer"
                 >
-                  <Sparkles className="w-3.5 h-3.5 mr-2 text-amber-400" />
+                  <Sparkles className="w-3.5 h-3.5 mr-2 text-terracotta" />
                   <div className="flex-1">
                     <p className="text-sm">새로 생성</p>
                     <p className="text-xs text-muted-foreground">AI 분석 (시간 소요)</p>
@@ -163,7 +163,7 @@ export function AssistantSelector({ assistantsHook, savedGraphs }: AssistantSele
                     rel="noopener noreferrer"
                     className="cursor-pointer"
                   >
-                    <Save className="w-3.5 h-3.5 mr-2 text-rose-400" />
+                    <Save className="w-3.5 h-3.5 mr-2 text-muted-foreground" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm truncate">{g.name}</p>
                       <p className="text-xs text-muted-foreground">
@@ -181,12 +181,12 @@ export function AssistantSelector({ assistantsHook, savedGraphs }: AssistantSele
       {/* 활성 보조작가 상태 배지 */}
       {activeAssistant && (
         <div className="mt-1.5 flex items-center gap-1.5">
-          <Badge variant="secondary" className="text-xs px-2 py-0.5 h-5 bg-green-500/20 text-green-400 border-0">
+          <Badge variant="secondary" className="text-xs px-2 py-0.5 h-5 bg-accent text-accent-foreground border-0">
             <CheckCircle2 className="w-3 h-3 mr-0.5" />
             활성
           </Badge>
           {activeAssistant.data_store_id && (
-            <Badge variant="secondary" className="text-xs px-2 py-0.5 h-5 bg-blue-500/20 text-blue-400 border-0">
+            <Badge variant="secondary" className="text-xs px-2 py-0.5 h-5 bg-secondary text-secondary-foreground border-0">
               데이터 스토어
             </Badge>
           )}

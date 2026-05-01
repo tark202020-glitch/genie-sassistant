@@ -33,11 +33,11 @@ export function UploadProgress({ step, message, onClose }: UploadProgressProps) 
               <div
                 className={`w-5 h-5 rounded-full flex items-center justify-center ${
                   isPast
-                    ? 'bg-green-500 text-white'
+                    ? 'bg-terracotta text-white'
                     : isActive && !isError
-                    ? 'bg-blue-500 text-white animate-pulse'
+                    ? 'bg-accent-foreground text-white animate-pulse'
                     : isError && isActive
-                    ? 'bg-red-500 text-white'
+                    ? 'bg-destructive text-white'
                     : 'bg-muted text-muted-foreground'
                 }`}
               >
@@ -55,7 +55,7 @@ export function UploadProgress({ step, message, onClose }: UploadProgressProps) 
                 {s.label}
               </span>
               {i < STEPS.length - 1 && (
-                <div className={`w-3 h-0.5 ${isPast ? 'bg-green-500' : 'bg-muted'}`} />
+                <div className={`w-3 h-0.5 ${isPast ? 'bg-terracotta' : 'bg-muted'}`} />
               )}
             </div>
           );
@@ -63,7 +63,7 @@ export function UploadProgress({ step, message, onClose }: UploadProgressProps) 
       </div>
       <p
         className={`text-xs ${
-          isError ? 'text-red-400' : step === 'complete' ? 'text-green-400' : 'text-muted-foreground'
+          isError ? 'text-destructive' : step === 'complete' ? 'text-terracotta' : 'text-muted-foreground'
         }`}
       >
         {message}
@@ -71,7 +71,7 @@ export function UploadProgress({ step, message, onClose }: UploadProgressProps) 
       {isError && onClose && (
         <button
           onClick={onClose}
-          className="mt-1 flex items-center gap-1 text-xs text-blue-400 hover:underline"
+          className="mt-1 flex items-center gap-1 text-xs text-terracotta hover:underline"
         >
           <X className="w-3 h-3" /> 닫기
         </button>

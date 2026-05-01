@@ -49,11 +49,11 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-2 w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-            <Bot className="w-6 h-6 text-primary" />
+          <div className="mx-auto mb-2 w-12 h-12 rounded-lg bg-accent flex items-center justify-center">
+            <Bot className="w-6 h-6 text-accent-foreground" />
           </div>
-          <CardTitle className="text-xl">Genie Assistant</CardTitle>
-          <p className="text-xs text-muted-foreground/50 font-mono">{APP_VERSION}</p>
+          <CardTitle className="text-xl font-serif font-normal">Genie Assistant</CardTitle>
+          <p className="text-xs text-muted-foreground font-mono">{APP_VERSION}</p>
           <CardDescription>로그인하여 시작하세요</CardDescription>
         </CardHeader>
         <CardContent>
@@ -113,7 +113,7 @@ export default function LoginPage() {
           </form>
           <p className="text-sm text-center text-muted-foreground mt-4">
             계정이 없으신가요?{' '}
-            <Link href="/register" className="text-primary hover:underline font-medium">
+            <Link href="/register" className="text-terracotta hover:underline font-medium">
               회원가입
             </Link>
           </p>

@@ -31,12 +31,14 @@ CREATE INDEX IF NOT EXISTS documents_source_file_idx ON documents (source_file);
 CREATE INDEX IF NOT EXISTS documents_assistant_id_idx ON documents (assistant_id);
 
 -- 5. 유사도 검색 RPC 함수
+-- ★ v2: filter_source_file 파라미터 추가 (파일 지정 검색 지원)
 CREATE OR REPLACE FUNCTION match_documents(
   query_embedding VECTOR(768),
   match_threshold FLOAT DEFAULT 0.5,
   match_count INT DEFAULT 5,
   filter_assistant_id UUID DEFAULT NULL,
-  filter_doc_type TEXT DEFAULT NULL
+  filter_doc_type TEXT DEFAULT NULL,
+  filter_source_file TEXT DEFAULT NULL
 )
 RETURNS TABLE (
   id BIGINT,
@@ -66,8 +68,16 @@ BEGIN
       ELSE d.assistant_id = filter_assistant_id
     END
     AND (filter_doc_type IS NULL OR d.doc_type = filter_doc_type)
+    AND (filter_source_file IS NULL OR d.source_file = filter_source_file)
     AND 1 - (d.embedding <=> query_embedding) > match_threshold
   ORDER BY d.embedding <=> query_embedding
   LIMIT match_count;
 END;
 $$;
+
+-- ============================================
+-- ★ 기존 DB 업데이트 시 아래 SQL만 실행하세요
+-- Supabase 대시보드 > SQL Editor에서 실행
+-- ============================================
+-- DROP FUNCTION IF EXISTS match_documents;
+-- 위의 CREATE OR REPLACE FUNCTION match_documents(...) 전체를 실행

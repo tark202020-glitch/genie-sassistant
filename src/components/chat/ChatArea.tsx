@@ -77,10 +77,10 @@ export function ChatArea({
         <div className="py-4 px-6 space-y-6">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-[60vh] text-muted-foreground">
-              <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
-                <Sparkles className="w-8 h-8 text-primary" />
+              <div className="w-16 h-16 rounded-lg bg-accent flex items-center justify-center mb-4">
+                <Sparkles className="w-8 h-8 text-accent-foreground" />
               </div>
-              <p className="text-lg font-medium text-foreground">
+              <p className="text-lg font-serif font-normal text-foreground">
                 {activeAssistant
                   ? `${activeAssistant.name}에게 질문해보세요!`
                   : '시나리오, 드라마 대본 작성, 무엇이든 물어보세요!'}
