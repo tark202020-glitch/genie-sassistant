@@ -9,6 +9,7 @@ import { useDocuments } from '@/hooks/use-documents';
 import { useAssistants } from '@/hooks/use-assistants';
 import { useConversations } from '@/hooks/use-conversations';
 import { useState } from 'react';
+import type { ChatAttachment } from '@/components/chat/ChatInput';
 
 export default function Home() {
   const documents = useDocuments();
@@ -17,6 +18,12 @@ export default function Home() {
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
+  const attachmentsRef = useRef<ChatAttachment[]>([]);
+
+  useEffect(() => {
+    attachmentsRef.current = attachments;
+  }, [attachments]);
 
   useEffect(() => {
     fetch('/api/auth/me')
@@ -25,8 +32,10 @@ export default function Home() {
       .catch(() => {});
   }, []);
 
-  const { messages, setMessages, input, handleInputChange, handleSubmit, isLoading } = useChat({
-    body: { assistantId: assistantsHook.activeAssistantId },
+  const { messages, setMessages, input, setInput, handleInputChange, handleSubmit, isLoading } = useChat({
+    body: {
+      assistantId: assistantsHook.activeAssistantId,
+    },
     onFinish: async (message) => {
       const convId = activeConvRef.current;
       if (convId) {
@@ -43,9 +52,49 @@ export default function Home() {
 
   const creatingRef = useRef(false);
 
+  const handleAttachFiles = useCallback(async (files: File[]) => {
+    for (const file of files) {
+      const idx = attachmentsRef.current.length;
+      const newAtt: ChatAttachment = {
+        fileName: file.name,
+        fileSize: file.size,
+        text: '',
+        status: 'uploading',
+      };
+      setAttachments(prev => [...prev, newAtt]);
+
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const res = await fetch('/api/chat-upload', { method: 'POST', body: formData });
+        const data = await res.json();
+
+        if (!res.ok) {
+          setAttachments(prev =>
+            prev.map((a, i) => i === idx ? { ...a, status: 'error' as const, error: data.error } : a)
+          );
+        } else {
+          setAttachments(prev =>
+            prev.map((a, i) => i === idx ? { ...a, status: 'ready' as const, text: data.text, fileSize: data.fileSize } : a)
+          );
+        }
+      } catch {
+        setAttachments(prev =>
+          prev.map((a, i) => i === idx ? { ...a, status: 'error' as const, error: '업로드 실패' } : a)
+        );
+      }
+    }
+  }, []);
+
+  const handleRemoveAttachment = useCallback((index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
   const handleChatSubmit = useCallback(async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!input.trim() || isLoading) return;
+    const readyAttachments = attachmentsRef.current.filter(a => a.status === 'ready');
+    if (!input.trim() && readyAttachments.length === 0) return;
+    if (isLoading) return;
 
     let convId = conversationsHook.activeConversationId;
 
@@ -54,27 +103,50 @@ export default function Home() {
       const autoTitle = input.trim().slice(0, 30) + (input.trim().length > 30 ? '...' : '');
       convId = await conversationsHook.createConversation(
         assistantsHook.activeAssistantId,
-        autoTitle,
+        autoTitle || (readyAttachments[0]?.fileName || '새 대화'),
       );
       creatingRef.current = false;
     }
 
-    if (convId) {
-      activeConvRef.current = convId;
-      conversationsHook.saveMessage(convId, 'user', input.trim());
+    let finalMessage = input.trim();
+
+    if (readyAttachments.length > 0) {
+      const fileTexts = readyAttachments
+        .map(a => `--- 첨부 파일: ${a.fileName} ---\n${a.text}`)
+        .join('\n\n');
+      const fileNames = readyAttachments.map(a => a.fileName).join(', ');
+
+      if (finalMessage) {
+        finalMessage = `${finalMessage}\n\n---\n[첨부 파일: ${fileNames}]\n\n${fileTexts}`;
+      } else {
+        finalMessage = `[첨부 파일: ${fileNames}]\n이 파일의 내용을 분석해주세요.\n\n${fileTexts}`;
+      }
     }
 
-    handleSubmit(e);
-  }, [input, isLoading, conversationsHook, assistantsHook.activeAssistantId, handleSubmit]);
+    if (convId) {
+      activeConvRef.current = convId;
+      conversationsHook.saveMessage(convId, 'user', finalMessage);
+    }
+
+    setAttachments([]);
+    setInput(finalMessage);
+
+    // useChat의 handleSubmit을 트리거하기 위해 setTimeout 사용
+    setTimeout(() => {
+      handleSubmit(e);
+    }, 0);
+  }, [input, isLoading, conversationsHook, assistantsHook.activeAssistantId, handleSubmit, setInput]);
 
   const handleLoadConversation = useCallback(async (id: string) => {
     const msgs = await conversationsHook.loadConversation(id);
     setMessages(msgs);
+    setAttachments([]);
   }, [conversationsHook, setMessages]);
 
   const handleNewConversation = useCallback(() => {
     conversationsHook.startNewConversation();
     setMessages([]);
+    setAttachments([]);
   }, [conversationsHook, setMessages]);
 
   // 보조작가 전환 시 전용 문서 로드
@@ -120,8 +192,11 @@ export default function Home() {
           input={input}
           isLoading={isLoading}
           activeAssistant={assistantsHook.activeAssistant}
+          attachments={attachments}
           onInputChange={handleInputChange}
           onSubmit={handleChatSubmit}
+          onAttachFiles={handleAttachFiles}
+          onRemoveAttachment={handleRemoveAttachment}
         />
       </main>
     </div>

@@ -12,8 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ThemeToggle } from '@/components/shared/ThemeToggle';
 import type { Assistant } from '@/types';
-
-const APP_VERSION = 'V1.000';
+import { APP_VERSION } from '@/lib/version';
 
 interface HeaderProps {
   sidebarOpen: boolean;

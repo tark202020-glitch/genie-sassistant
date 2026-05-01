@@ -1,5 +1,48 @@
 # Genie Assistant Changelog
 
+## [V1.021] - 2026-05-01
+
+### 🔄 Build Update
+- **Summary**: 채팅창 파일 첨부 기능 구현 (+ 버튼 / 드래그&드롭) + 버전 중앙관리 적용
+- **Detail** :
+  - ✅ `src/app/api/chat-upload/route.ts` [NEW]: 채팅 첨부 파일 텍스트 추출 API (PDF/TXT/MD/CSV, 20MB 제한)
+  - ✅ `src/components/chat/ChatInput.tsx`: + 버튼 파일 첨부 + 드래그&드롭 지원, 첨부 파일 목록 UI (상태: 업로드 중/완료/오류)
+  - ✅ `src/components/chat/ChatArea.tsx`: 채팅 영역 전체 드래그&드롭 오버레이 추가
+  - ✅ `src/components/chat/MessageBubble.tsx`: 사용자 메시지에 첨부 파일명 표시 (파일 아이콘 + 이름 배지)
+  - ✅ `src/app/page.tsx`: 파일 첨부 상태 관리 + 첨부 텍스트를 메시지에 인라인 포함하여 전송
+  - ✅ `src/app/api/chat/route.ts`: `analyze_attachment` 인텐트 추가 (7종 인텐트 라우팅), 첨부 텍스트 분리 처리 (라우터에는 질문만, Gemini에는 전체 전달)
+  - ✅ `src/components/layout/Header.tsx`: 하드코딩 V1.000 → `import { APP_VERSION } from '@/lib/version'` 중앙 관리 전환
+  - ✅ `src/app/login/page.tsx`: 동일하게 버전 중앙 관리 전환
+  - ✅ `src/lib/version.ts`: V1.001 → V1.021 업데이트
+  - ✅ `src/app/api/conversations/route.ts`: 디버그 로그 제거
+- **Build Time**: 2026-05-01
+
+## [V1.020] - 2026-05-01
+
+### 🔄 Build Update
+- **Summary**: 로그인/회원가입 시스템 구현 + 계정별 대화 분리 + GCS 인증 개선
+- **Detail** :
+  - ✅ `src/lib/auth.ts` [NEW]: 이메일+비밀번호 인증, 세션 관리, PBKDF2 해싱
+  - ✅ `src/app/login/page.tsx` [NEW]: 로그인 페이지 (자동 로그인 체크 기능)
+  - ✅ `src/app/register/page.tsx` [NEW]: 회원가입 페이지 (이메일 형식 ID)
+  - ✅ `src/app/api/auth/*` [NEW]: login/logout/register/me API 엔드포인트
+  - ✅ `src/utils/supabase/middleware.ts`: 미인증 시 /login 리다이렉트 가드
+  - ✅ `src/app/api/conversations/route.ts`: 계정별 대화 분리 (user_id 필터링)
+  - ✅ `src/app/api/conversations/[id]/route.ts`: 본인 대화만 조회/수정/삭제
+  - ✅ `src/components/layout/Header.tsx`: 로그인 이메일 + 버전(V1.020) + 로그아웃 버튼
+  - ✅ `src/components/sidebar/ConversationList.tsx`: 대화 삭제 + 영구 삭제 확인 모달
+  - ✅ `src/lib/gcs.ts` [NEW]: GCS 인증 통합 (JSON 환경변수/파일 경로 자동 감지)
+  - ✅ `src/lib/version.ts` [NEW]: 버전 중앙 관리
+  - ✅ `src/app/globals.css`: 코드 블록 white-space: pre-wrap 줄넘김 적용
+  - ✅ `src/components/ui/scroll-area.tsx`: Radix ScrollArea display:table 오버플로우 수정
+  - ✅ `supabase_migration_auth.sql` [NEW]: app_users, app_sessions 테이블 + conversations.user_id 컬럼
+  - 🐛 Supabase Auth rate limit 해결 (불필요한 auth.getUser 호출 제거)
+  - 🐛 conversations FK 참조 오류 수정 (auth.users → app_users)
+  - 🐛 사이드바/채팅 영역 독립 스크롤 수정
+  - 🔴 보조작가 대본 전체 로드 + 공유 학습자료 RAG 보조 검색 통합 (search/conversation/analyze 인텐트)
+  - 🔴 GCS 초기화 5개 API → 공통 모듈(lib/gcs.ts) 통합
+- **Build Time**: 2026-05-01
+
 ## [Alpha V1.019] - 2026-03-16 00:56:00
 
 ### 🔄 Build Update
