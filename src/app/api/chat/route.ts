@@ -157,7 +157,17 @@ export async function POST(req: Request) {
   const { messages, assistantId } = await req.json();
 
   // 1. 사용자 마지막 메시지를 추출
-  const lastUserMessage = messages.filter((m: any) => m.role === 'user').pop()?.content || '';
+  const rawLastMessage = messages.filter((m: any) => m.role === 'user').pop()?.content || '';
+
+  // 첨부 파일 텍스트 분리: 인텐트 라우터에는 질문만, Gemini에는 전체 전달
+  const attachmentMarker = '\n\n---\n[첨부 파일: ';
+  const hasAttachment = rawLastMessage.includes(attachmentMarker);
+  const lastUserMessage = hasAttachment
+    ? rawLastMessage.substring(0, rawLastMessage.indexOf(attachmentMarker))
+    : rawLastMessage;
+  const attachmentText = hasAttachment
+    ? rawLastMessage.substring(rawLastMessage.indexOf(attachmentMarker))
+    : '';
 
   // 보조작가 정보 조회
   let assistantInfo: any = null;
@@ -188,15 +198,17 @@ export async function POST(req: Request) {
   }
 
   const routerPrompt = `
-  다음 사용자 메시지를 분석하여 6가지 카테고리 중 하나로 분류하세요.
+  다음 사용자 메시지를 분석하여 7가지 카테고리 중 하나로 분류하세요.
   1. "conversation": 단순한 인사, 일상 대화, 격려 요청, 날씨 등 일반적인 잡담.
   2. "search": 특정 정보를 묻는 질문, 업로드된 문서에 대한 일반적 질문, 지식이나 자료를 검색해야 하는 질문.
   3. "analyze_script": 대본(시나리오/각본/스크립트) 하나에 대한 분석 요청. 예: 미드포인트 분석, 캐릭터 아크, 플롯 구조, 서사 흐름.
   4. "analyze_reference": 참고자료에 대한 분석, 요약, 정리 요청.
   5. "analyze": 사용자가 직접 작성한 새 캐릭터 설정/대본 초안/플롯을 메시지에 포함하여 평가/피드백을 요청하는 경우.
   6. "compare_scripts": 두 개 이상의 대본/버전을 비교하는 요청. 예: "V4.8과 V4.9 차이점", "1부와 2부 비교", "두 대본의 달라진 점", "버전 차이 분석" 등.
+  7. "analyze_attachment": 사용자가 채팅에서 파일을 직접 첨부하여 질문하는 경우. 첨부 파일이 있다는 표시가 있으면 이 인텐트를 선택하세요.
 
   중요 판별 규칙:
+  ${hasAttachment ? '- ⚠️ 사용자가 파일을 채팅에 직접 첨부했습니다 → "analyze_attachment"를 우선 선택하세요.' : ''}
   - "비교", "차이점", "달라진", "변경사항", "수정사항", "vs", "VS", "대비", "비교해" 키워드 → "compare_scripts"
   - 두 버전/문서를 언급하며 비교를 요청하면 → "compare_scripts"
   - 단일 대본 분석(비교 아님) → "analyze_script"
@@ -222,16 +234,19 @@ export async function POST(req: Request) {
     const routerResult = await routerModel.generateContent(routerPrompt);
     const routerResponseText = routerResult.response.text();
     const parsedIntent = JSON.parse(routerResponseText);
-    if (["conversation", "search", "analyze_script", "analyze_reference", "analyze", "compare_scripts"].includes(parsedIntent.intent)) {
+    if (["conversation", "search", "analyze_script", "analyze_reference", "analyze", "compare_scripts", "analyze_attachment"].includes(parsedIntent.intent)) {
       intent = parsedIntent.intent;
     }
     if (parsedIntent.files && Array.isArray(parsedIntent.files)) {
       compareFiles = parsedIntent.files;
     }
-    console.log("[Intent Router] Classified as:", intent, compareFiles.length > 0 ? `| 비교 파일: ${compareFiles}` : '');
+    if (hasAttachment && intent !== 'analyze_attachment') {
+      intent = 'analyze_attachment';
+    }
+    console.log("[Intent Router] Classified as:", intent, compareFiles.length > 0 ? `| 비교 파일: ${compareFiles}` : '', hasAttachment ? '| 첨부파일 있음' : '');
   } catch (error) {
     console.error("[Intent Router] Classification failed, fallback to search", error);
-    intent = "search";
+    intent = hasAttachment ? "analyze_attachment" : "search";
   }
 
   // 3. 보조작가 페르소나 기반 시스템 프롬프트 구성
@@ -467,6 +482,32 @@ export async function POST(req: Request) {
       break;
     }
 
+    case 'analyze_attachment': {
+      // 채팅에서 직접 첨부된 파일 분석
+      const sharedAttContext = await searchByVector(lastUserMessage, assistantId, 'all', 5);
+      console.log(`[Analyze Attachment] 첨부 파일 분석 | 질문: "${lastUserMessage.substring(0, 50)}..." | 첨부 텍스트 길이: ${attachmentText.length}자`);
+
+      systemPrompt = `${basePersona}
+      사용자가 채팅에서 직접 파일을 첨부하여 질문했습니다.
+      아래에 첨부된 파일의 전체 텍스트가 포함되어 있습니다.
+      처음부터 끝까지 꼼꼼히 읽고, 사용자의 질문에 정확하게 답변하세요.
+
+      분석 시 다음을 고려하세요:
+      - 파일이 대본/시나리오인 경우: 서사 구조, 캐릭터 아크, 갈등 구조, 대사 분석
+      - 파일이 참고자료인 경우: 핵심 내용 파악, 정보 추출, 요약
+      - 파일이 기타 문서인 경우: 문서 내용에 맞는 적절한 분석
+
+      사용자의 구체적 질문이 있다면 그에 맞춰 답변하고,
+      질문이 없거나 막연하다면 파일의 핵심 내용을 요약하고 분석해주세요.
+      [참고 자료]가 있다면 보조적으로 활용하세요.
+
+      [참고 자료]
+      ${sharedAttContext || '없음'}`;
+
+      targetModelName = 'gemini-2.5-flash';
+      break;
+    }
+
     case 'analyze': {
       const sharedAnalyzeContext = await searchByVector(lastUserMessage, null, 'all', 5);
 
@@ -566,7 +607,8 @@ export async function POST(req: Request) {
 
   const chat = model.startChat({ history: chatHistory });
 
-  const response = await chat.sendMessageStream(lastUserMessage);
+  const geminiMessage = hasAttachment ? rawLastMessage : lastUserMessage;
+  const response = await chat.sendMessageStream(geminiMessage);
   const stream = GoogleGenerativeAIStream(response);
 
   return new StreamingTextResponse(stream);

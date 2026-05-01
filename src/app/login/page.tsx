@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Bot, Loader2 } from 'lucide-react';
+import { APP_VERSION } from '@/lib/version';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -52,7 +53,7 @@ export default function LoginPage() {
             <Bot className="w-6 h-6 text-primary" />
           </div>
           <CardTitle className="text-xl">Genie Assistant</CardTitle>
-          <p className="text-xs text-muted-foreground/50 font-mono">V1.000</p>
+          <p className="text-xs text-muted-foreground/50 font-mono">{APP_VERSION}</p>
           <CardDescription>로그인하여 시작하세요</CardDescription>
         </CardHeader>
         <CardContent>
