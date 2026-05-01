@@ -107,3 +107,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS document_summaries_source_file_assistant
 --
 -- 2) document_summaries 테이블 생성:
 -- 위의 CREATE TABLE IF NOT EXISTS document_summaries(...) 및 인덱스 전체를 실행
+--
+-- 3) assistants 테이블에 response_style 컬럼 추가:
+-- ALTER TABLE assistants ADD COLUMN IF NOT EXISTS response_style TEXT;

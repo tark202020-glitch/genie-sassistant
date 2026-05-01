@@ -15,6 +15,7 @@ export interface Assistant {
   name: string;
   specialty: string;
   persona: string | null;
+  response_style: string | null;
   data_store_id: string | null;
   gcs_folder: string | null;
   created_at: string;

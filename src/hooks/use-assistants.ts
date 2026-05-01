@@ -81,6 +81,28 @@ export function useAssistants() {
     }
   }, [newName, newSpecialty, newPersona, fetchAssistants]);
 
+  const handleUpdateResponseStyle = useCallback(async (assistantId: string, responseStyle: string | null) => {
+    try {
+      const res = await fetch('/api/assistants', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: assistantId, response_style: responseStyle }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        // 로컬 상태 갱신
+        setAssistants(prev => prev.map(a =>
+          a.id === assistantId ? { ...a, response_style: responseStyle } : a
+        ));
+        toast.success('응답 스타일이 저장되었습니다.');
+      } else {
+        toast.error(`저장 실패: ${data.error}`);
+      }
+    } catch {
+      toast.error('응답 스타일 저장 중 오류 발생');
+    }
+  }, []);
+
   const handleDeleteAssistant = useCallback(async (id: string, name: string) => {
     try {
       const res = await fetch('/api/assistants', {
@@ -204,6 +226,7 @@ export function useAssistants() {
     fetchAssistants,
     fetchAssistantDocs,
     handleCreateAssistant,
+    handleUpdateResponseStyle,
     handleDeleteAssistant,
     handleAssistantFileUpload,
     handleDeleteAssistantDoc,

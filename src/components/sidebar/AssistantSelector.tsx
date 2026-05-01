@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Bot, ChevronDown, Plus, CheckCircle2, Pin, Trash2, Users, Sparkles, Save } from 'lucide-react';
+import { Bot, ChevronDown, Plus, CheckCircle2, Pin, Trash2, Users, Sparkles, Save, Settings, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -45,10 +45,48 @@ export function AssistantSelector({ assistantsHook, savedGraphs }: AssistantSele
     setNewPersona,
     creating,
     handleCreateAssistant,
+    handleUpdateResponseStyle,
     handleDeleteAssistant,
   } = assistantsHook;
 
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [editingResponseStyle, setEditingResponseStyle] = useState('');
+  const [savingStyle, setSavingStyle] = useState(false);
+
+  const DEFAULT_RESPONSE_STYLE = `당신은 메인 작가의 창작을 돕는 보조작가입니다. 직접 대본이나 시나리오를 작성하지 마세요.
+
+당신의 역할:
+- 상황에 맞는 아이디어, 모티브, 영감을 제공
+- 학습한 자료를 기반으로 관련 사례, 패턴, 참고점 제시
+- 캐릭터, 구조, 갈등 등에 대한 분석적 의견 제공
+- 메인 작가가 스스로 선택할 수 있도록 여러 방향 제안
+
+하지 말아야 할 것:
+- 완성된 대사나 장면을 직접 작성하지 않기
+- 대본 형식으로 답변하지 않기
+- 작가의 창작 영역을 대신하지 않기`;
+
+  const openSettings = () => {
+    setEditingResponseStyle(activeAssistant?.response_style || DEFAULT_RESPONSE_STYLE);
+    setShowSettings(true);
+  };
+
+  const handleSaveStyle = async () => {
+    if (!activeAssistant) return;
+    setSavingStyle(true);
+    // 기본값과 같으면 NULL로 저장 (DB에 커스텀 값만 보관)
+    const styleToSave = editingResponseStyle.trim() === DEFAULT_RESPONSE_STYLE.trim()
+      ? null
+      : editingResponseStyle.trim();
+    await handleUpdateResponseStyle(activeAssistant.id, styleToSave);
+    setSavingStyle(false);
+    setShowSettings(false);
+  };
+
+  const handleResetStyle = () => {
+    setEditingResponseStyle(DEFAULT_RESPONSE_STYLE);
+  };
 
   return (
     <div className="p-3 border-b border-border bg-background/50">
@@ -178,7 +216,7 @@ export function AssistantSelector({ assistantsHook, savedGraphs }: AssistantSele
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* 활성 보조작가 상태 배지 */}
+      {/* 활성 보조작가 상태 배지 + 설정 버튼 */}
       {activeAssistant && (
         <div className="mt-1.5 flex items-center gap-1.5">
           <Badge variant="secondary" className="text-xs px-2 py-0.5 h-5 bg-accent text-accent-foreground border-0">
@@ -190,6 +228,13 @@ export function AssistantSelector({ assistantsHook, savedGraphs }: AssistantSele
               데이터 스토어
             </Badge>
           )}
+          <button
+            onClick={openSettings}
+            className="ml-auto p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+            title="보조작가 설정"
+          >
+            <Settings className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
 
@@ -227,6 +272,52 @@ export function AssistantSelector({ assistantsHook, savedGraphs }: AssistantSele
             <Button onClick={handleCreateAssistant} disabled={!newName || !newSpecialty || creating}>
               {creating ? '생성 중...' : '생성'}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 보조작가 설정 다이얼로그 (응답 스타일) */}
+      <Dialog open={showSettings} onOpenChange={setShowSettings}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings className="w-5 h-5" />
+              보조작가 설정 — {activeAssistant?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">응답 스타일 지침</label>
+              <Textarea
+                value={editingResponseStyle}
+                onChange={(e) => setEditingResponseStyle(e.target.value)}
+                placeholder="보조작가의 응답 방식을 지정하세요..."
+                rows={10}
+                className="text-sm leading-relaxed"
+              />
+              <p className="text-xs text-muted-foreground mt-1.5">
+                보조작가가 답변하는 방식을 직접 지정할 수 있습니다.
+              </p>
+            </div>
+          </div>
+          <DialogFooter className="flex-row justify-between sm:justify-between">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleResetStyle}
+              className="text-muted-foreground"
+            >
+              <RotateCcw className="w-3.5 h-3.5 mr-1" />
+              기본값으로 초기화
+            </Button>
+            <div className="flex gap-2">
+              <Button variant="ghost" onClick={() => setShowSettings(false)}>
+                취소
+              </Button>
+              <Button onClick={handleSaveStyle} disabled={savingStyle}>
+                {savingStyle ? '저장 중...' : '저장'}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

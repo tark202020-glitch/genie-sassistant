@@ -87,6 +87,36 @@ export async function POST(req: Request) {
   }
 }
 
+// PATCH: 보조작가 설정 업데이트 (응답 스타일 등)
+export async function PATCH(req: Request) {
+  try {
+    const { id, response_style } = await req.json();
+
+    if (!id) {
+      return NextResponse.json({ error: '보조작가 ID가 필요합니다.' }, { status: 400 });
+    }
+
+    const updateData: Record<string, any> = {};
+    if (response_style !== undefined) {
+      // null이면 기본값으로 초기화, 문자열이면 커스텀 스타일 저장
+      updateData.response_style = response_style;
+    }
+
+    const { error } = await supabase
+      .from('assistants')
+      .update(updateData)
+      .eq('id', id);
+
+    if (error) throw error;
+
+    console.log(`[Assistants] 설정 업데이트: ${id}`);
+    return NextResponse.json({ success: true });
+  } catch (err: any) {
+    console.error('[Assistants PATCH Exception]', err);
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
+
 // DELETE: 보조작가 삭제
 export async function DELETE(req: Request) {
   try {
