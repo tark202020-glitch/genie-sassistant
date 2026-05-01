@@ -1,18 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { Storage } from '@google-cloud/storage';
+import { storage, BUCKET_NAME } from '@/lib/gcs';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 );
-
-const storage = new Storage({
-  keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-  projectId: process.env.GCP_PROJECT_ID,
-});
-
-const BUCKET_NAME = process.env.GCS_BUCKET_NAME || 'story_ai_helper';
 
 // GET: 보조작가 목록 조회
 export async function GET() {

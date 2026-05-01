@@ -1,18 +1,11 @@
 import { NextResponse } from 'next/server';
-import { Storage } from '@google-cloud/storage';
 import { createClient } from '@supabase/supabase-js';
-
-const storage = new Storage({
-  keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-  projectId: process.env.GCP_PROJECT_ID,
-});
+import { storage, BUCKET_NAME } from '@/lib/gcs';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 );
-
-const BUCKET_NAME = process.env.GCS_BUCKET_NAME || 'story_ai_helper';
 
 // GET: 학습된 문서 목록 조회 (pgvector documents 테이블에서)
 export async function GET() {

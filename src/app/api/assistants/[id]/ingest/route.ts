@@ -1,19 +1,12 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { Storage } from '@google-cloud/storage';
 import { generateEmbeddings, splitTextIntoChunks, extractTextFromBuffer } from '@/lib/embeddings';
+import { storage, BUCKET_NAME } from '@/lib/gcs';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 );
-
-const storage = new Storage({
-  keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-  projectId: process.env.GCP_PROJECT_ID,
-});
-
-const BUCKET_NAME = process.env.GCS_BUCKET_NAME || 'story_ai_helper';
 
 export const maxDuration = 300; // 대용량 파일 처리를 위해 5분으로 확장
 
