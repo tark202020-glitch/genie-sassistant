@@ -37,3 +37,5 @@ gcp-service-account.json
 *.tsbuildinfo
 next-env.d.ts
 node_modules
+
+.vercel

@@ -282,15 +282,15 @@ function CharacterGraphContent() {
 
         const midX = (source.x! + target.x!) / 2;
         const midY = (source.y! + target.y!) / 2;
-        ctx.font = '9px "Pretendard", "Apple SD Gothic Neo", sans-serif';
+        ctx.font = 'bold 14px "Pretendard", "Apple SD Gothic Neo", sans-serif';
         ctx.fillStyle = edge.color + 'cc';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
 
-        const labelWidth = ctx.measureText(edge.type).width + 8;
-        ctx.fillStyle = '#0a0a1a';
-        ctx.fillRect(midX - labelWidth / 2, midY - 7, labelWidth, 14);
-        ctx.fillStyle = edge.color + 'cc';
+        const labelWidth = ctx.measureText(edge.type).width + 14;
+        ctx.fillStyle = '#0a0a1aee';
+        ctx.fillRect(midX - labelWidth / 2, midY - 11, labelWidth, 22);
+        ctx.fillStyle = edge.color + 'ee';
         ctx.fillText(edge.type, midX, midY);
       }
 
@@ -323,14 +323,19 @@ function CharacterGraphContent() {
         ctx.textBaseline = 'middle';
         ctx.fillText(roleIcon[node.role] || '👤', node.x!, node.y!);
 
-        ctx.font = `bold 11px "Pretendard", "Apple SD Gothic Neo", sans-serif`;
-        ctx.fillStyle = '#ffffffdd';
+        ctx.font = `bold 18px "Pretendard", "Apple SD Gothic Neo", sans-serif`;
+        ctx.fillStyle = '#ffffffee';
         ctx.textAlign = 'center';
-        ctx.fillText(node.label, node.x!, node.y! + r + 14);
+        // 이름 배경 (가독성 강화)
+        const nameWidth = ctx.measureText(node.label).width + 16;
+        ctx.fillStyle = '#0a0a1acc';
+        ctx.fillRect(node.x! - nameWidth / 2, node.y! + r + 4, nameWidth, 24);
+        ctx.fillStyle = '#ffffffee';
+        ctx.fillText(node.label, node.x!, node.y! + r + 20);
 
-        ctx.font = `9px "Pretendard", "Apple SD Gothic Neo", sans-serif`;
-        ctx.fillStyle = `${color}aa`;
-        ctx.fillText(node.role, node.x!, node.y! + r + 26);
+        ctx.font = `13px "Pretendard", "Apple SD Gothic Neo", sans-serif`;
+        ctx.fillStyle = `${color}cc`;
+        ctx.fillText(node.role, node.x!, node.y! + r + 38);
       }
 
       ctx.restore();

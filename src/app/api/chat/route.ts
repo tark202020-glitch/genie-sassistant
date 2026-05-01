@@ -10,6 +10,8 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 );
 
+const APP_ID = process.env.APP_ID || 'genie_assistant';
+
 // pgvector 유사도 검색
 async function searchByVector(
   query: string,
@@ -17,7 +19,7 @@ async function searchByVector(
   docTypeFilter?: 'script' | 'reference' | 'all' | null,
   matchCount: number = 10
 ): Promise<string> {
-  console.log(`[RAG] 벡터 검색 시작 | 쿼리: "${query}" | 보조작가: ${assistantId || '없음'} | 필터: ${docTypeFilter || 'all'} | 검색수: ${matchCount}`);
+  console.log(`[RAG] 벡터 검색 시작 | 쿼리: "${query}" | 보조작가: ${assistantId || '없음'} | 필터: ${docTypeFilter || 'all'} | 검색수: ${matchCount} | 앱: ${APP_ID}`);
 
   try {
     // 질문을 임베딩
@@ -30,6 +32,7 @@ async function searchByVector(
       match_count: matchCount,
       filter_assistant_id: null,
       filter_doc_type: (docTypeFilter && docTypeFilter !== 'all') ? docTypeFilter : null,
+      filter_app_id: APP_ID,
     });
 
     if (l1Err) console.error('[RAG] 레벨1 검색 오류:', l1Err.message);
@@ -53,6 +56,7 @@ async function searchByVector(
         match_count: matchCount,
         filter_assistant_id: assistantId,
         filter_doc_type: (docTypeFilter && docTypeFilter !== 'all') ? docTypeFilter : null,
+        filter_app_id: APP_ID,
       });
 
       if (l2Err) console.error('[RAG] 레벨2 검색 오류:', l2Err.message);
@@ -98,6 +102,7 @@ async function getFullDocumentText(sourceFile: string, assistantId?: string | nu
       .select('content')
       .eq('source_file', sourceFile)
       .eq('assistant_id', assistantId)
+      .eq('app_id', APP_ID)
       .order('id', { ascending: true });
 
     if (!error && data && data.length > 0) {
@@ -112,6 +117,7 @@ async function getFullDocumentText(sourceFile: string, assistantId?: string | nu
     .select('content')
     .eq('source_file', sourceFile)
     .is('assistant_id', null)
+    .eq('app_id', APP_ID)
     .order('id', { ascending: true });
 
   if (error) {
@@ -138,6 +144,7 @@ async function listUploadedDocuments(assistantId?: string | null): Promise<{ ass
       .from('documents')
       .select('source_file')
       .eq('assistant_id', assistantId)
+      .eq('app_id', APP_ID)
       .order('source_file', { ascending: true });
     if (data) assistantFiles.push(...[...new Set(data.map(d => d.source_file))]);
   }
@@ -147,6 +154,7 @@ async function listUploadedDocuments(assistantId?: string | null): Promise<{ ass
     .from('documents')
     .select('source_file')
     .is('assistant_id', null)
+    .eq('app_id', APP_ID)
     .order('source_file', { ascending: true });
   if (sharedData) sharedFiles.push(...[...new Set(sharedData.map(d => d.source_file))]);
 
@@ -408,7 +416,8 @@ export async function POST(req: Request) {
           .from('documents')
           .select('source_file')
           .eq('assistant_id', assistantId)
-          .eq('doc_type', 'reference');
+          .eq('doc_type', 'reference')
+          .eq('app_id', APP_ID);
         const refFiles = [...new Set((refDocs || []).map(d => d.source_file))];
         
         for (const fileName of refFiles) {

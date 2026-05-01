@@ -17,6 +17,7 @@ const supabase = createClient(
 );
 
 const BUCKET_NAME = process.env.GCS_BUCKET_NAME || 'story_ai_helper';
+const APP_ID = process.env.APP_ID || 'genie_assistant';
 
 export async function POST(req: Request) {
   try {
@@ -82,6 +83,7 @@ export async function POST(req: Request) {
       doc_type: 'script',
       source_file: fileName,
       gcs_uri: gcsUri,
+      app_id: APP_ID,
     }));
 
     // 배치 삽입 (500개씩)

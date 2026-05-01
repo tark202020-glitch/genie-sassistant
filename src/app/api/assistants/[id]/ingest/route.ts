@@ -14,6 +14,7 @@ const storage = new Storage({
 });
 
 const BUCKET_NAME = process.env.GCS_BUCKET_NAME || 'story_ai_helper';
+const APP_ID = process.env.APP_ID || 'genie_assistant';
 
 export const maxDuration = 300; // 대용량 파일 처리를 위해 5분으로 확장
 
@@ -30,6 +31,7 @@ export async function POST(
       .from('assistants')
       .select('*')
       .eq('id', id)
+      .eq('app_id', APP_ID)
       .single();
 
     if (fetchErr || !assistant) {
@@ -102,6 +104,7 @@ export async function POST(
       doc_type: docType,
       source_file: fileName,
       gcs_uri: gcsUri,
+      app_id: APP_ID,
     }));
 
     // 배치 삽입 (500개씩)

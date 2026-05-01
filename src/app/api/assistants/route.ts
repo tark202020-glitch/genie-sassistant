@@ -13,6 +13,7 @@ const storage = new Storage({
 });
 
 const BUCKET_NAME = process.env.GCS_BUCKET_NAME || 'story_ai_helper';
+const APP_ID = process.env.APP_ID || 'genie_assistant';
 
 // GET: 보조작가 목록 조회
 export async function GET() {
@@ -20,6 +21,7 @@ export async function GET() {
     const { data, error } = await supabase
       .from('assistants')
       .select('*')
+      .eq('app_id', APP_ID)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -46,6 +48,7 @@ export async function POST(req: Request) {
         name,
         specialty,
         persona: persona || null,
+        app_id: APP_ID,
       })
       .select()
       .single();
@@ -108,6 +111,7 @@ export async function DELETE(req: Request) {
       .from('assistants')
       .select('*')
       .eq('id', id)
+      .eq('app_id', APP_ID)
       .single();
 
     if (fetchErr || !assistant) {

@@ -6,6 +6,8 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 );
 
+const APP_ID = process.env.APP_ID || 'genie_assistant';
+
 // 코사인 유사도 계산 (벡터 2개)
 function cosineSimilarity(a: number[], b: number[]): number {
   let dotProduct = 0;
@@ -25,12 +27,14 @@ export async function GET() {
     const { data: assistants } = await supabase
       .from('assistants')
       .select('id, name, specialty')
+      .eq('app_id', APP_ID)
       .order('created_at', { ascending: true });
 
     // 2. 모든 문서의 대표 임베딩 조회 (source_file 별 첫 번째 청크)
     const { data: docs, error: docsErr } = await supabase
       .from('documents')
       .select('id, source_file, assistant_id, doc_type, embedding, metadata')
+      .eq('app_id', APP_ID)
       .order('id', { ascending: true });
 
     if (docsErr) throw docsErr;

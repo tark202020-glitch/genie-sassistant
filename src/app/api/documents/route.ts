@@ -13,6 +13,7 @@ const supabase = createClient(
 );
 
 const BUCKET_NAME = process.env.GCS_BUCKET_NAME || 'story_ai_helper';
+const APP_ID = process.env.APP_ID || 'genie_assistant';
 
 // GET: 학습된 문서 목록 조회 (pgvector documents 테이블에서)
 export async function GET() {
@@ -22,6 +23,7 @@ export async function GET() {
       .from('documents')
       .select('source_file, gcs_uri, doc_type, created_at')
       .is('assistant_id', null)
+      .eq('app_id', APP_ID)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -97,7 +99,8 @@ export async function DELETE(req: Request) {
         .from('documents')
         .delete({ count: 'exact' })
         .eq('source_file', source)
-        .is('assistant_id', null);
+        .is('assistant_id', null)
+        .eq('app_id', APP_ID);
 
       if (deleteErr) {
         console.error('[Documents] pgvector 삭제 실패:', deleteErr.message);

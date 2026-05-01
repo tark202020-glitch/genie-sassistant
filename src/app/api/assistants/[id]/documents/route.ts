@@ -13,6 +13,7 @@ const storage = new Storage({
 });
 
 const BUCKET_NAME = process.env.GCS_BUCKET_NAME || 'story_ai_helper';
+const APP_ID = process.env.APP_ID || 'genie_assistant';
 
 // GET: 보조작가 전용 문서 목록 (대본/자료 구분 포함)
 export async function GET(
@@ -27,6 +28,7 @@ export async function GET(
       .from('assistants')
       .select('*')
       .eq('id', id)
+      .eq('app_id', APP_ID)
       .single();
 
     if (fetchErr || !assistant) {
@@ -38,6 +40,7 @@ export async function GET(
       .from('documents')
       .select('source_file, gcs_uri, doc_type, created_at')
       .eq('assistant_id', id)
+      .eq('app_id', APP_ID)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -122,7 +125,8 @@ export async function DELETE(
         .from('documents')
         .delete({ count: 'exact' })
         .eq('source_file', source)
-        .eq('assistant_id', id);
+        .eq('assistant_id', id)
+        .eq('app_id', APP_ID);
 
       if (deleteErr) {
         console.error('[Assistant Docs] pgvector 삭제 실패:', deleteErr.message);
