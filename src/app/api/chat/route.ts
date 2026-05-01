@@ -492,25 +492,45 @@ export async function POST(req: Request) {
     }
 
     case 'analyze_attachment': {
-      // 채팅에서 직접 첨부된 파일 분석
-      const sharedAttContext = await searchByVector(lastUserMessage, assistantId, 'all', 5);
-      console.log(`[Analyze Attachment] 첨부 파일 분석 | 질문: "${lastUserMessage.substring(0, 50)}..." | 첨부 텍스트 길이: ${attachmentText.length}자`);
+      // 채팅에서 직접 첨부된 파일 분석 + 보조작가 대본 전체 로드 + 공유 RAG
+      let attAssistantContext = '';
+      if (assistantId && assistantFiles.length > 0) {
+        const scriptFullTexts: { name: string; text: string }[] = [];
+        for (const fileName of assistantFiles) {
+          const text = await getFullDocumentText(fileName, assistantId);
+          if (text) scriptFullTexts.push({ name: fileName, text });
+        }
+        if (scriptFullTexts.length > 0) {
+          attAssistantContext = scriptFullTexts
+            .map(s => `=== 📜 ${s.name} ===\n${s.text}`)
+            .join('\n\n---\n\n');
+        }
+      }
+
+      const sharedAttContext = await searchByVector(lastUserMessage, null, 'all', 5);
+
+      console.log(`[Analyze Attachment] 첨부 파일 분석 | 질문: "${lastUserMessage.substring(0, 50)}..." | 첨부 텍스트 길이: ${attachmentText.length}자 | 전용 대본: ${attAssistantContext ? `${attAssistantContext.length}자` : '없음'} | 공유 RAG: ${sharedAttContext ? '있음' : '없음'}`);
 
       systemPrompt = `${basePersona}
       사용자가 채팅에서 직접 파일을 첨부하여 질문했습니다.
-      아래에 첨부된 파일의 전체 텍스트가 포함되어 있습니다.
-      처음부터 끝까지 꼼꼼히 읽고, 사용자의 질문에 정확하게 답변하세요.
+      사용자 메시지에 첨부된 파일의 전체 텍스트가 포함되어 있습니다.
+
+      답변 시 다음 3가지 자료를 모두 활용하세요:
+      1. **[전용 대본/자료]**: 보조작가 전용으로 학습된 대본 전체 (가장 중요한 기반 자료)
+      2. **[채팅 첨부 파일]**: 사용자가 이번 메시지에 직접 첨부한 파일 (사용자 메시지에 포함됨)
+      3. **[공유 참고 자료]**: 공유 학습자료에서 관련 부분 (보조 참고용)
+
+      전용 대본/자료를 주요 기반으로 삼고, 첨부 파일과 공유 자료를 보조적으로 참고하여
+      사용자의 질문에 정확하고 풍부한 답변을 제공하세요.
 
       분석 시 다음을 고려하세요:
       - 파일이 대본/시나리오인 경우: 서사 구조, 캐릭터 아크, 갈등 구조, 대사 분석
       - 파일이 참고자료인 경우: 핵심 내용 파악, 정보 추출, 요약
-      - 파일이 기타 문서인 경우: 문서 내용에 맞는 적절한 분석
+      - 전용 대본과 첨부 파일 간 연관성이 있다면 연결하여 분석
 
-      사용자의 구체적 질문이 있다면 그에 맞춰 답변하고,
-      질문이 없거나 막연하다면 파일의 핵심 내용을 요약하고 분석해주세요.
-      [참고 자료]가 있다면 보조적으로 활용하세요.
+      ${attAssistantContext ? `[전용 대본/자료]\n${attAssistantContext}` : '[전용 대본/자료]\n없음'}
 
-      [참고 자료]
+      [공유 참고 자료]
       ${sharedAttContext || '없음'}`;
 
       targetModelName = 'gemini-2.5-flash';
