@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { ResponsiveChord } from '@nivo/chord';
-import { Bot } from 'lucide-react';
+import { Bot, X } from 'lucide-react';
 
 interface ChordData {
   keys: string[];
@@ -36,12 +36,28 @@ const JIEUN_COLORS = [
 ];
 
 export function CharacterChordDiagram({ chord, insights }: CharacterChordDiagramProps) {
-  const [activeArc, setActiveArc] = useState<string | null>(null);
+  const [selectedArc, setSelectedArc] = useState<string | null>(null);
 
-  // 활성 캐릭터의 관계 요약
+  // 클릭 토글 핸들러
+  const handleArcClick = useCallback((arc: any) => {
+    const id = arc.id as string;
+    setSelectedArc(prev => prev === id ? null : id);
+  }, []);
+
+  const handleClearSelection = useCallback(() => {
+    setSelectedArc(null);
+  }, []);
+
+  const handleLegendClick = useCallback((name: string) => {
+    setSelectedArc(prev => prev === name ? null : name);
+  }, []);
+
+  // 선택된 캐릭터 기반으로 opacity를 제어하기 위한 커스텀 매트릭스
+  // nivo chord는 내장 hover를 비활성화 할 수 없으므로,
+  // isInteractive=false로 내장 hover를 끄고 클릭은 wrapper div에서 처리
   const activeInfo = useMemo(() => {
-    if (!activeArc) return null;
-    const idx = chord.keys.indexOf(activeArc);
+    if (!selectedArc) return null;
+    const idx = chord.keys.indexOf(selectedArc);
     if (idx < 0) return null;
 
     const connections = chord.matrix[idx]
@@ -52,12 +68,12 @@ export function CharacterChordDiagram({ chord, insights }: CharacterChordDiagram
     const totalWeight = connections.reduce((s, c) => s + c.value, 0);
 
     return {
-      name: activeArc,
+      name: selectedArc,
       role: chord.roles[idx],
       connections,
       totalWeight,
     };
-  }, [activeArc, chord]);
+  }, [selectedArc, chord]);
 
   // 빈 매트릭스 체크
   const hasData = chord.matrix.some(row => row.some(v => v > 0));
@@ -95,12 +111,13 @@ export function CharacterChordDiagram({ chord, insights }: CharacterChordDiagram
             labelTextColor="#e2e8f0"
             colors={JIEUN_COLORS.slice(0, chord.keys.length)}
             motionConfig="gentle"
+            isInteractive={true}
             activeArcOpacity={1}
             inactiveArcOpacity={0.15}
             activeRibbonOpacity={0.85}
             inactiveRibbonOpacity={0.1}
-            onArcMouseEnter={(arc) => setActiveArc(arc.id as string)}
-            onArcMouseLeave={() => setActiveArc(null)}
+            onArcClick={handleArcClick}
+            onRibbonClick={handleClearSelection}
             theme={{
               text: { fill: '#94a3b8', fontSize: 13, fontFamily: 'Pretendard, sans-serif' },
               tooltip: {
@@ -128,7 +145,7 @@ export function CharacterChordDiagram({ chord, insights }: CharacterChordDiagram
             </div>
           ) : (
             <div className="space-y-0.5">
-              <p className="text-white/20 text-xs">캐릭터를 호버하세요</p>
+              <p className="text-white/20 text-xs">캐릭터를 클릭하세요</p>
             </div>
           )}
         </div>
@@ -136,13 +153,20 @@ export function CharacterChordDiagram({ chord, insights }: CharacterChordDiagram
 
       {/* 사이드 패널 */}
       <div className="w-72 border-l border-white/5 flex flex-col overflow-hidden">
-        {/* 관계 상세 (호버 시) */}
+        {/* 선택된 캐릭터 관계 상세 */}
         {activeInfo && (
           <div className="p-4 border-b border-white/5 space-y-3">
             <div className="flex items-center gap-2">
               <span className="w-3 h-3 rounded-full" style={{ background: JIEUN_COLORS[chord.keys.indexOf(activeInfo.name)] }} />
               <span className="text-white font-medium text-sm">{activeInfo.name}</span>
-              <span className="text-white/40 text-xs ml-auto">{activeInfo.role}</span>
+              <span className="text-white/40 text-xs">{activeInfo.role}</span>
+              <button
+                onClick={handleClearSelection}
+                className="ml-auto p-0.5 rounded hover:bg-white/10 text-white/30 hover:text-white/60 transition-colors"
+                title="선택 해제"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
             </div>
             <div className="space-y-1.5">
               {activeInfo.connections.map(c => {
@@ -188,26 +212,29 @@ export function CharacterChordDiagram({ chord, insights }: CharacterChordDiagram
           </div>
         )}
 
-        {/* 범례 */}
+        {/* 범례 — 클릭으로 선택 */}
         <div className="p-4 border-t border-white/5">
-          <p className="text-white/30 text-[10px] uppercase tracking-wider mb-2">Characters</p>
-          <div className="space-y-1 max-h-32 overflow-auto">
+          <p className="text-white/30 text-[10px] uppercase tracking-wider mb-2">Characters — 클릭하여 선택</p>
+          <div className="space-y-1 max-h-40 overflow-auto">
             {chord.keys.map((name, i) => (
-              <div
+              <button
                 key={name}
-                className={`flex items-center gap-2 text-xs py-0.5 px-1.5 rounded cursor-default transition-colors ${
-                  activeArc === name ? 'bg-white/10' : 'hover:bg-white/5'
+                className={`flex items-center gap-2 text-xs py-1 px-1.5 rounded w-full text-left transition-colors ${
+                  selectedArc === name
+                    ? 'bg-white/10 ring-1 ring-white/20'
+                    : 'hover:bg-white/5'
                 }`}
-                onMouseEnter={() => setActiveArc(name)}
-                onMouseLeave={() => setActiveArc(null)}
+                onClick={() => handleLegendClick(name)}
               >
                 <span
                   className="w-2.5 h-2.5 rounded-sm shrink-0"
                   style={{ background: JIEUN_COLORS[i] || '#6B8FA3' }}
                 />
-                <span className="text-white/60 truncate">{name}</span>
+                <span className={`truncate ${selectedArc === name ? 'text-white' : 'text-white/60'}`}>
+                  {name}
+                </span>
                 <span className="text-white/25 text-[10px] ml-auto">{chord.roles[i]}</span>
-              </div>
+              </button>
             ))}
           </div>
         </div>
