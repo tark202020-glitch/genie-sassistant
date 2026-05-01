@@ -56,6 +56,7 @@ interface CharacterTabProps {
 export function CharacterTab({ assistantId }: CharacterTabProps) {
   const [graphData, setGraphData] = useState<CharGraphData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState('');
   const [hoveredNode, setHoveredNode] = useState<CharNode | null>(null);
   const [draggedNode, setDraggedNode] = useState<CharNode | null>(null);
@@ -68,23 +69,74 @@ export function CharacterTab({ assistantId }: CharacterTabProps) {
   const mouseRef = useRef({ x: 0, y: 0, isDown: false, isPanning: false, startX: 0, startY: 0 });
   const transformRef = useRef({ x: 0, y: 0, scale: 1 });
 
-  // 데이터 로드
-  useEffect(() => {
-    setLoading(true);
-    setError('');
-    fetch(`/api/character-graph?assistantId=${assistantId}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.error) setError(data.error);
-        else setGraphData(data);
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+  // 캐시에서 로드
+  const loadCached = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/script-analyses?assistantId=${assistantId}&type=characters`);
+      const data = await res.json();
+      if (data.analyses && data.analyses.length > 0) {
+        setGraphData(data.analyses[0].data as CharGraphData);
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
   }, [assistantId]);
+
+  // AI 분석 실행 + 자동 저장
+  const analyze = useCallback(async () => {
+    setAnalyzing(true);
+    setError('');
+    try {
+      const res = await fetch(`/api/character-graph?assistantId=${assistantId}`);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.error || `서버 오류 (${res.status})`);
+      }
+      const data = await res.json();
+      if (data.error) {
+        throw new Error(data.error);
+      }
+      setGraphData(data);
+
+      // 자동 저장
+      try {
+        await fetch('/api/script-analyses', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            assistantId,
+            analysisType: 'characters',
+            name: '자동 저장',
+            data,
+          }),
+        });
+      } catch (saveErr) {
+        console.error('캐릭터 분석 자동 저장 실패:', saveErr);
+      }
+    } catch (err: any) {
+      setError(err.message || '캐릭터 분석 중 오류가 발생했습니다.');
+    } finally {
+      setAnalyzing(false);
+    }
+  }, [assistantId]);
+
+  // 최초 로드: 캐시 → 없으면 분석
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const hasCached = await loadCached();
+      if (!hasCached) {
+        await analyze();
+      }
+      setLoading(false);
+    })();
+  }, [loadCached, analyze]);
 
   // Canvas 시뮬레이션
   useEffect(() => {
-    if (!graphData || !canvasRef.current) return;
+    if (!graphData || !canvasRef.current || viewMode !== 'canvas') return;
 
     const canvas = canvasRef.current;
     const width = canvas.parentElement?.clientWidth || 800;
@@ -126,14 +178,12 @@ export function CharacterTab({ assistantId }: CharacterTabProps) {
       alpha *= 0.995;
       if (alpha < 0.001) alpha = 0;
 
-      // 중심 인력
       for (const node of nodes) {
         if (node.fx !== null && node.fx !== undefined) continue;
         node.vx! += (w / 2 - node.x!) * 0.0008 * (alpha > 0 ? 1 : 0);
         node.vy! += (h / 2 - node.y!) * 0.0008 * (alpha > 0 ? 1 : 0);
       }
 
-      // 노드 반발
       for (let i = 0; i < nodes.length; i++) {
         for (let j = i + 1; j < nodes.length; j++) {
           const dx = nodes[j].x! - nodes[i].x!;
@@ -147,7 +197,6 @@ export function CharacterTab({ assistantId }: CharacterTabProps) {
         }
       }
 
-      // 엣지 스프링
       for (const edge of edges) {
         const source = nodes.find(n => n.id === edge.source);
         const target = nodes.find(n => n.id === edge.target);
@@ -163,7 +212,6 @@ export function CharacterTab({ assistantId }: CharacterTabProps) {
         if (target.fx === null || target.fx === undefined) { target.vx! -= fx; target.vy! -= fy; }
       }
 
-      // 속도 적용
       for (const node of nodes) {
         if (node.fx !== null && node.fx !== undefined) {
           node.x = node.fx; node.y = node.fy!; node.vx = 0; node.vy = 0;
@@ -173,14 +221,12 @@ export function CharacterTab({ assistantId }: CharacterTabProps) {
         }
       }
 
-      // 렌더링
       ctx.save();
       ctx.scale(2, 2);
       ctx.clearRect(0, 0, w, h);
       ctx.fillStyle = '#0a0a1a';
       ctx.fillRect(0, 0, w, h);
 
-      // 그리드
       ctx.strokeStyle = 'rgba(100, 100, 255, 0.03)';
       ctx.lineWidth = 1;
       for (let x = (t.x % 50); x < w; x += 50) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
@@ -189,7 +235,6 @@ export function CharacterTab({ assistantId }: CharacterTabProps) {
       ctx.translate(t.x, t.y);
       ctx.scale(t.scale, t.scale);
 
-      // 엣지
       for (const edge of edges) {
         const source = nodes.find(n => n.id === edge.source);
         const target = nodes.find(n => n.id === edge.target);
@@ -214,19 +259,16 @@ export function CharacterTab({ assistantId }: CharacterTabProps) {
         ctx.fillText(edge.type, midX, midY);
       }
 
-      // 노드
       for (const node of nodes) {
         const r = node.size;
         const color = node.color;
 
-        // 글로우
         const glow = ctx.createRadialGradient(node.x!, node.y!, r * 0.3, node.x!, node.y!, r * 2.5);
         glow.addColorStop(0, `${color}30`);
         glow.addColorStop(1, 'transparent');
         ctx.fillStyle = glow;
         ctx.fillRect(node.x! - r * 3, node.y! - r * 3, r * 6, r * 6);
 
-        // 원
         ctx.beginPath();
         ctx.arc(node.x!, node.y!, r, 0, Math.PI * 2);
         const grad = ctx.createRadialGradient(node.x! - r * 0.3, node.y! - r * 0.3, 0, node.x!, node.y!, r);
@@ -238,14 +280,12 @@ export function CharacterTab({ assistantId }: CharacterTabProps) {
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // 역할 아이콘
         const roleIcon: Record<string, string> = { '주인공': '⭐', '조연': '👤', '적대자': '🔥', '조력자': '🤝', '기타': '👥' };
         ctx.font = `${r > 20 ? 14 : 11}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(roleIcon[node.role] || '👤', node.x!, node.y!);
 
-        // 이름
         ctx.font = 'bold 18px "Pretendard", sans-serif';
         const nw = ctx.measureText(node.label).width + 16;
         ctx.fillStyle = '#0a0a1acc';
@@ -254,7 +294,6 @@ export function CharacterTab({ assistantId }: CharacterTabProps) {
         ctx.textAlign = 'center';
         ctx.fillText(node.label, node.x!, node.y! + r + 20);
 
-        // 역할
         ctx.font = '13px "Pretendard", sans-serif';
         ctx.fillStyle = `${color}cc`;
         ctx.fillText(node.role, node.x!, node.y! + r + 38);
@@ -266,7 +305,7 @@ export function CharacterTab({ assistantId }: CharacterTabProps) {
 
     tick();
     return () => cancelAnimationFrame(animRef.current);
-  }, [graphData]);
+  }, [graphData, viewMode]);
 
   const getPos = useCallback((e: React.MouseEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect();
@@ -327,25 +366,13 @@ export function CharacterTab({ assistantId }: CharacterTabProps) {
     };
   }, []);
 
-  const handleReload = () => {
-    setLoading(true);
-    setError('');
-    setGraphData(null);
-    fetch(`/api/character-graph?assistantId=${assistantId}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.error) setError(data.error);
-        else setGraphData(data);
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
-  };
-
-  if (loading) {
+  if (loading || analyzing) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4">
         <Loader2 className="w-10 h-10 text-rose-400 animate-spin" />
-        <p className="text-white/60">캐릭터 관계도 생성 중... (1~2분 소요)</p>
+        <p className="text-white/60">
+          {analyzing ? '캐릭터 관계도 생성 중... (1~2분 소요)' : '저장된 데이터 불러오는 중...'}
+        </p>
       </div>
     );
   }
@@ -354,7 +381,7 @@ export function CharacterTab({ assistantId }: CharacterTabProps) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4">
         <p className="text-red-400">{error}</p>
-        <Button variant="outline" onClick={handleReload} className="bg-white/5 border-white/10 text-white/80">
+        <Button variant="outline" onClick={analyze} className="bg-white/5 border-white/10 text-white/80">
           <RefreshCw className="w-4 h-4 mr-1.5" />
           다시 시도
         </Button>
@@ -419,11 +446,11 @@ export function CharacterTab({ assistantId }: CharacterTabProps) {
           <Button
             variant="outline"
             size="sm"
-            onClick={handleReload}
-            disabled={loading}
+            onClick={analyze}
+            disabled={analyzing}
             className="bg-white/5 border-white/10 text-white/70 hover:bg-white/10"
           >
-            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${analyzing ? 'animate-spin' : ''}`} />
             다시 분석
           </Button>
         </div>

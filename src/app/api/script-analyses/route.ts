@@ -38,6 +38,46 @@ export async function GET(req: Request) {
   }
 }
 
+// POST: 분석 결과 저장 (upsert — 같은 assistant + type + name이면 업데이트)
+export async function POST(req: Request) {
+  try {
+    const { assistantId, analysisType, name, data } = await req.json();
+
+    if (!assistantId || !analysisType || !data) {
+      return NextResponse.json({ error: 'assistantId, analysisType, data가 필요합니다.' }, { status: 400 });
+    }
+
+    const saveName = name || '자동 저장';
+
+    // 기존 데이터 확인
+    const { data: existing } = await supabase
+      .from('script_analyses')
+      .select('id')
+      .eq('assistant_id', assistantId)
+      .eq('analysis_type', analysisType)
+      .eq('name', saveName)
+      .maybeSingle();
+
+    if (existing) {
+      const { error } = await supabase
+        .from('script_analyses')
+        .update({ data, updated_at: new Date().toISOString() })
+        .eq('id', existing.id);
+      if (error) throw error;
+    } else {
+      const { error } = await supabase
+        .from('script_analyses')
+        .insert({ assistant_id: assistantId, name: saveName, analysis_type: analysisType, data });
+      if (error) throw error;
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (err: any) {
+    console.error('[ScriptAnalyses] 저장 실패:', err.message);
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
+
 // DELETE: 분석 결과 삭제
 export async function DELETE(req: Request) {
   try {
