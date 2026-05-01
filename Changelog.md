@@ -1,5 +1,22 @@
 # Genie Assistant Changelog
 
+## [V1.026] - 2026-05-02
+
+### 🎵 캐릭터 관계도 Chord 다이어그램 + iPad 호환
+- **Summary**: @nivo/chord 기반 Chord 다이어그램 추가 (기존 Canvas 그래프와 토글 비교), iPad/모바일 터치 지원, 분석 결과 저장 기능
+- **Detail**:
+  - ✅ `src/components/script-organizer/CharacterChordDiagram.tsx`: Nivo Chord 도넛형 시각화 (Steel Blue & Cream 테마)
+  - ✅ `src/components/script-organizer/CharacterTab.tsx`: 그래프/코드 뷰 토글, 캐시 저장/로드, 터치 이벤트
+  - ✅ `src/components/script-organizer/SettingCanvas.tsx`: 터치 이벤트 + iOS 캔버스 크기 제한 처리
+  - ✅ `src/app/api/character-graph/route.ts`: chord matrix + AI 인사이트 응답 추가
+  - ✅ `src/app/api/script-analyses/route.ts`: POST 엔드포인트 추가 (저장/업데이트)
+  - ✅ `src/app/api/script-organizer/analyze/route.ts`: Gemini 에러 핸들링 강화 (3회 재시도, JSON 추출 폴백, 텍스트 크기 제한)
+  - ✅ Chord 인터랙션: 호버 → 클릭 방식으로 변경 (깜빡임 해결)
+  - ✅ iPad/모바일: 1손가락 드래그, 2손가락 핀치 줌, iOS 캔버스 16M픽셀 제한 처리
+  - ✅ 3개 탭 모두 동일한 저장 패턴: 최초 AI 분석 → DB 캐시 → 재방문 즉시 로드
+  - ✅ Gemini 모델명 `gemini-2.5-flash-preview-05-20` → `gemini-2.5-flash` (404 해결)
+- **Build Time**: 2026-05-02
+
 ## [V1.025] - 2026-05-01
 
 ### 📖 대본 정리 페이지 (Script Organizer)
