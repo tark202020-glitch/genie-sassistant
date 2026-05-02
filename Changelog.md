@@ -1,5 +1,18 @@
 # Genie Assistant Changelog
 
+## [V1.029] - 2026-05-02
+
+### 📝 대본 정리 페이지 텍스트 기반 UI 전환
+- **Summary**: 캐릭터/배경 탭을 Canvas 시각화에서 텍스트 카드/목록으로 전환, 캐릭터 상세 정보 확장
+- **Detail**:
+  - ✅ `src/components/script-organizer/CharacterTab.tsx`: Canvas/Chord 관계도 제거 → 텍스트 프로필 카드 그리드 (이름/나이/직업/목적/성격/관계)
+  - ✅ `src/components/script-organizer/SettingDiagramTab.tsx`: Canvas 다이어그램 제거 → 유형별(실내/실외/차량/가상) 텍스트 목록
+  - ✅ `src/app/api/character-graph/route.ts`: AI 프롬프트에 나이/직업/목적/성격/관계요약 추출 추가
+  - ✅ `src/app/script-organizer/page.tsx`: 탭 라벨 "캐릭터 관계도" → "캐릭터 분석"
+  - ✅ 화별 요약 탭: 현상 유지
+  - ✅ 캐릭터 관계도는 숨김 처리 (추후 오픈 예정)
+- **Build Time**: 2026-05-02
+
 ## [V1.028] - 2026-05-02
 
 ### 🎨 로고 이미지 다크/라이트 모드 적용
