@@ -103,6 +103,9 @@ export async function GET(req: Request) {
     4. relationship type은 다음 중 하나: "가족", "연인", "친구", "동료", "적대", "상사/부하", "스승/제자", "기타"
     5. weight는 1-5 (1=약한 관계, 5=핵심 관계)
     6. description은 한국어로 간결하게
+    7. 대본에서 명시적으로 확인할 수 없는 정보는 "불명"으로 표기
+    8. 정보가 적은 단역이라도 알 수 있는 정보는 최대한 기재
+    9. relationships_summary는 해당 캐릭터의 주요 인물 관계를 한 문장으로 요약
 
     응답 형식 (JSON):
     {
@@ -110,8 +113,13 @@ export async function GET(req: Request) {
         {
           "name": "캐릭터 이름",
           "role": "주인공",
+          "age": "30대 초반" or "불명",
+          "occupation": "형사" or "불명",
+          "goal": "진실을 밝히는 것" or "불명",
+          "personality": "냉철하지만 정의감이 강함" or "불명",
           "description": "캐릭터 한 줄 설명",
-          "episodes": [1, 2, 3, 4]
+          "episodes": [1, 2, 3, 4],
+          "relationships_summary": "A와 연인, B의 상사, C와 적대 관계"
         }
       ],
       "relationships": [
@@ -160,8 +168,13 @@ export async function GET(req: Request) {
       id: c.name,
       label: c.name,
       role: c.role || '기타',
+      age: c.age || '불명',
+      occupation: c.occupation || '불명',
+      goal: c.goal || '불명',
+      personality: c.personality || '불명',
       description: c.description || '',
       episodes: c.episodes || [],
+      relationshipsSummary: c.relationships_summary || '',
       color: ROLE_COLORS[c.role] || ROLE_COLORS['기타'],
       size: 16 + (c.episodes?.length || 1) * 4,
     }));

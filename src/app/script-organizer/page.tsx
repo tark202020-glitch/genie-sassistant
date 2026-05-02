@@ -29,7 +29,7 @@ function ScriptOrganizerContent() {
   }
 
   const tabs: { key: TabType; label: string; icon: React.ReactNode }[] = [
-    { key: 'characters', label: '캐릭터 관계도', icon: <Users className="w-4 h-4" /> },
+    { key: 'characters', label: '캐릭터 분석', icon: <Users className="w-4 h-4" /> },
     { key: 'settings', label: '배경 정리', icon: <MapPin className="w-4 h-4" /> },
     { key: 'episodes', label: '화별 요약', icon: <FileText className="w-4 h-4" /> },
   ];
