@@ -19,8 +19,12 @@ const lora = Lora({
 });
 
 export const metadata: Metadata = {
-  title: 'Genie Assistant',
+  title: '지작 — AI 대본 작가 도구',
   description: '드라마/영화 대본 작가를 위한 AI 공동 창작 플랫폼',
+  icons: {
+    icon: '/favicon.ico',
+    apple: '/apple-touch-icon.png',
+  },
 };
 
 export default function RootLayout({
