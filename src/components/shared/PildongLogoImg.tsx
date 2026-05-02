@@ -30,7 +30,7 @@ export function PildongLogoImg({ size = 40, className = '' }: PildongLogoImgProp
       <span className={`inline-block ${className}`} style={{ width, height }}>
         <Image
           src="/logo_B.png"
-          alt="필동 로고"
+          alt="지작 로고"
           width={width}
           height={height}
           className="dark:hidden"
@@ -38,7 +38,7 @@ export function PildongLogoImg({ size = 40, className = '' }: PildongLogoImgProp
         />
         <Image
           src="/logo_W.png"
-          alt="필동 로고"
+          alt="지작 로고"
           width={width}
           height={height}
           className="hidden dark:block"
@@ -53,7 +53,7 @@ export function PildongLogoImg({ size = 40, className = '' }: PildongLogoImgProp
   return (
     <Image
       src={src}
-      alt="필동 로고"
+      alt="지작 로고"
       width={width}
       height={height}
       className={className}

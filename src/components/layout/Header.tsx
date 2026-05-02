@@ -40,7 +40,7 @@ export function Header({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <PildongLogoImg size={28} />
-          <h1 className="text-2xl font-serif font-normal text-foreground">필동</h1>
+          <h1 className="text-2xl font-serif font-normal text-foreground">지작</h1>
           <span className="text-xs text-muted-foreground font-mono">{APP_VERSION}</span>
         </div>
         {activeAssistant ? (

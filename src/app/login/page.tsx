@@ -53,7 +53,7 @@ export default function LoginPage() {
           <div className="mx-auto mb-2 flex items-center justify-center">
             <PildongLogoImg size={36} />
           </div>
-          <CardTitle className="text-xl font-serif font-normal">필동</CardTitle>
+          <CardTitle className="text-xl font-serif font-normal">지작</CardTitle>
           <p className="text-xs text-muted-foreground font-mono">{APP_VERSION}</p>
           <CardDescription>로그인하여 시작하세요</CardDescription>
         </CardHeader>

@@ -26,7 +26,7 @@ function Nav() {
       <div className="max-w-[1200px] mx-auto px-6 h-16 flex items-center justify-between">
         <Link href="/landing" className="flex items-center gap-2">
           <PildongLogoImg size={28} />
-          <span className="text-xl font-serif font-normal text-foreground">필동</span>
+          <span className="text-xl font-serif font-normal text-foreground">지작</span>
         </Link>
         <div className="flex items-center gap-3">
           <Link
@@ -156,7 +156,7 @@ function CoreValues() {
     <section id="features" className="py-16 md:py-24">
       <div className="max-w-[1200px] mx-auto px-6">
         <h2 className="text-3xl md:text-4xl font-serif font-normal text-center text-foreground mb-12">
-          왜 필동인가요?
+          왜 지작인가요?
         </h2>
         <div className="grid md:grid-cols-3 gap-6">
           {VALUES.map((v) => (
@@ -311,7 +311,7 @@ function Features() {
     <section className="py-16 md:py-24 bg-muted/20">
       <div className="max-w-[1200px] mx-auto px-6">
         <h2 className="text-3xl md:text-4xl font-serif font-normal text-center text-foreground mb-16">
-          필동이 제공하는 기능
+          지작이 제공하는 기능
         </h2>
 
         {/* Feature A: 학습자료 관리 */}
@@ -504,7 +504,7 @@ function FinalCTA() {
         <div className="max-w-[1200px] mx-auto px-6 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <PildongLogoImg size={18} />
-            <span className="text-sm text-muted-foreground">© 2026 필동 (Pildong)</span>
+            <span className="text-sm text-muted-foreground">© 2026 지작 (Jijak)</span>
           </div>
           <div className="flex items-center gap-4 text-xs text-muted-foreground">
             <span>이용약관</span>
