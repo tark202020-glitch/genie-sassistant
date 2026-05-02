@@ -84,13 +84,10 @@ export function SettingDiagramTab({ assistantId }: SettingDiagramTabProps) {
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const hasCached = await loadCached();
-      if (!hasCached) {
-        await analyze();
-      }
+      await loadCached();
       setLoading(false);
     })();
-  }, [loadCached, analyze]);
+  }, [loadCached]);
 
   // Build a lookup: nodeId → related edges
   const relMap = useMemo(() => {
@@ -126,13 +123,21 @@ export function SettingDiagramTab({ assistantId }: SettingDiagramTabProps) {
     return TYPE_ORDER.filter((t) => byType.has(t)).map((t) => ({ type: t, nodes: byType.get(t)! }));
   }, [graphData]);
 
-  if (loading || analyzing) {
+  if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4">
         <Loader2 className="w-10 h-10 text-indigo-400 animate-spin" />
-        <p className="text-white/60">
-          {analyzing ? '배경/공간 분석 중... (1~2분 소요)' : '저장된 데이터 불러오는 중...'}
-        </p>
+        <p className="text-white/60">저장된 데이터 불러오는 중...</p>
+      </div>
+    );
+  }
+
+  if (analyzing) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4">
+        <Loader2 className="w-10 h-10 text-indigo-400 animate-spin" />
+        <p className="text-white/60">배경/공간 분석 중... (1~2분 소요)</p>
+        <p className="text-white/30 text-xs">완료 후 자동 저장됩니다</p>
       </div>
     );
   }
@@ -151,9 +156,18 @@ export function SettingDiagramTab({ assistantId }: SettingDiagramTabProps) {
 
   if (!graphData || graphData.nodes.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 text-white/40">
-        <MapPin className="w-12 h-12" />
-        <p>분석할 배경 데이터가 없습니다.</p>
+      <div className="flex flex-col items-center justify-center h-full gap-4">
+        <MapPin className="w-12 h-12 text-white/30" />
+        <p className="text-white/50">배경 분석 데이터가 없습니다.</p>
+        <p className="text-white/30 text-xs">아래 버튼을 눌러 AI 분석을 시작하세요. (1~2분 소요)</p>
+        <Button
+          onClick={analyze}
+          disabled={analyzing}
+          className="bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400 border border-indigo-500/30"
+        >
+          <RefreshCw className={`w-4 h-4 mr-1.5 ${analyzing ? 'animate-spin' : ''}`} />
+          배경 분석 시작
+        </Button>
       </div>
     );
   }

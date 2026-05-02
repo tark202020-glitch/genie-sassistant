@@ -59,21 +59,26 @@ export function EpisodeSummaryTab({ assistantId }: EpisodeSummaryTabProps) {
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const hasCached = await loadCached();
-      if (!hasCached) {
-        await analyze();
-      }
+      await loadCached();
       setLoading(false);
     })();
-  }, [loadCached, analyze]);
+  }, [loadCached]);
 
-  if (loading || analyzing) {
+  if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-4">
         <Loader2 className="w-10 h-10 text-amber-400 animate-spin" />
-        <p className="text-white/60">
-          {analyzing ? '화별 요약 분석 중... (대본 수에 따라 1~3분 소요)' : '저장된 데이터 불러오는 중...'}
-        </p>
+        <p className="text-white/60">저장된 데이터 불러오는 중...</p>
+      </div>
+    );
+  }
+
+  if (analyzing) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
+        <Loader2 className="w-10 h-10 text-amber-400 animate-spin" />
+        <p className="text-white/60">화별 요약 분석 중... (대본 수에 따라 1~3분 소요)</p>
+        <p className="text-white/30 text-xs">완료 후 자동 저장됩니다</p>
       </div>
     );
   }
@@ -92,9 +97,18 @@ export function EpisodeSummaryTab({ assistantId }: EpisodeSummaryTabProps) {
 
   if (summaries.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 gap-4 text-white/40">
-        <FileText className="w-12 h-12" />
-        <p>분석할 대본이 없습니다.</p>
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
+        <FileText className="w-12 h-12 text-white/30" />
+        <p className="text-white/50">화별 요약 데이터가 없습니다.</p>
+        <p className="text-white/30 text-xs">아래 버튼을 눌러 AI 분석을 시작하세요. (대본 수에 따라 1~3분 소요)</p>
+        <Button
+          onClick={analyze}
+          disabled={analyzing}
+          className="bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30"
+        >
+          <RefreshCw className={`w-4 h-4 mr-1.5 ${analyzing ? 'animate-spin' : ''}`} />
+          화별 요약 분석 시작
+        </Button>
       </div>
     );
   }

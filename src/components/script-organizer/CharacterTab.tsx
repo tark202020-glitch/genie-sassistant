@@ -106,23 +106,30 @@ export function CharacterTab({ assistantId }: CharacterTabProps) {
     }
   }, [assistantId]);
 
-  // 최초 로드
+  // 최초 로드 — 캐시만 확인 (자동 분석 안 함)
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const hasCached = await loadCached();
-      if (!hasCached) await analyze();
+      await loadCached();
       setLoading(false);
     })();
-  }, [loadCached, analyze]);
+  }, [loadCached]);
 
-  if (loading || analyzing) {
+  if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-full min-h-[400px] gap-4">
         <Loader2 className="w-10 h-10 text-rose-400 animate-spin" />
-        <p className="text-white/60">
-          {analyzing ? '캐릭터 관계도 생성 중... (1~2분 소요)' : '저장된 데이터 불러오는 중...'}
-        </p>
+        <p className="text-white/60">저장된 데이터 불러오는 중...</p>
+      </div>
+    );
+  }
+
+  if (analyzing) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full min-h-[400px] gap-4">
+        <Loader2 className="w-10 h-10 text-rose-400 animate-spin" />
+        <p className="text-white/60">캐릭터 분석 중... (1~2분 소요)</p>
+        <p className="text-white/30 text-xs">완료 후 자동 저장됩니다</p>
       </div>
     );
   }
@@ -141,9 +148,18 @@ export function CharacterTab({ assistantId }: CharacterTabProps) {
 
   if (!graphData || graphData.nodes.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full min-h-[400px] gap-4 text-white/40">
-        <Users className="w-12 h-12" />
-        <p>분석할 대본 데이터가 없습니다.</p>
+      <div className="flex flex-col items-center justify-center h-full min-h-[400px] gap-4">
+        <Users className="w-12 h-12 text-white/30" />
+        <p className="text-white/50">캐릭터 분석 데이터가 없습니다.</p>
+        <p className="text-white/30 text-xs">아래 버튼을 눌러 AI 분석을 시작하세요. (1~2분 소요)</p>
+        <Button
+          onClick={analyze}
+          disabled={analyzing}
+          className="bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30"
+        >
+          <RefreshCw className={`w-4 h-4 mr-1.5 ${analyzing ? 'animate-spin' : ''}`} />
+          캐릭터 분석 시작
+        </Button>
       </div>
     );
   }
