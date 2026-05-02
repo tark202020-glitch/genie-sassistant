@@ -63,18 +63,28 @@ export async function POST(req: Request) {
         .from('script_analyses')
         .update({ data, updated_at: new Date().toISOString() })
         .eq('id', existing.id);
-      if (error) throw error;
+      if (error) {
+        console.error('[ScriptAnalyses] UPDATE 실패:', error);
+        return NextResponse.json({
+          error: `저장 실패: ${error.message}${error.code === '42501' ? ' (RLS 정책 필요 — Supabase SQL Editor에서 실행: CREATE POLICY "Allow all for anon" ON script_analyses FOR ALL USING (true) WITH CHECK (true);)' : ''}`,
+        }, { status: 500 });
+      }
     } else {
       const { error } = await supabase
         .from('script_analyses')
         .insert({ assistant_id: assistantId, name: saveName, analysis_type: analysisType, data });
-      if (error) throw error;
+      if (error) {
+        console.error('[ScriptAnalyses] INSERT 실패:', error);
+        return NextResponse.json({
+          error: `저장 실패: ${error.message}${error.code === '42501' ? ' (RLS 정책 필요 — Supabase SQL Editor에서 실행: CREATE POLICY "Allow all for anon" ON script_analyses FOR ALL USING (true) WITH CHECK (true);)' : ''}`,
+        }, { status: 500 });
+      }
     }
 
     return NextResponse.json({ success: true });
   } catch (err: any) {
-    console.error('[ScriptAnalyses] 저장 실패:', err.message);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error('[ScriptAnalyses] 저장 실패:', err.message || err);
+    return NextResponse.json({ error: err.message || '저장 중 오류가 발생했습니다.' }, { status: 500 });
   }
 }
 

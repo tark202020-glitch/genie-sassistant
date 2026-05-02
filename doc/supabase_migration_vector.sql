@@ -122,3 +122,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS document_summaries_source_file_assistant
 --   updated_at TIMESTAMPTZ DEFAULT NOW()
 -- );
 -- CREATE INDEX IF NOT EXISTS script_analyses_assistant_id_idx ON script_analyses(assistant_id);
+--
+-- 5) script_analyses RLS 정책 (anon 역할 허용 — 필수!):
+-- ALTER TABLE script_analyses ENABLE ROW LEVEL SECURITY;
+-- CREATE POLICY "Allow all for anon" ON script_analyses FOR ALL USING (true) WITH CHECK (true);
