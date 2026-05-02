@@ -167,7 +167,7 @@ export function CharacterTab({ assistantId }: CharacterTabProps) {
     });
     observer.observe(container);
     return () => observer.disconnect();
-  }, []);
+  }, [graphData, viewMode]);
 
   // 노드 탐색 헬퍼
   const findNodeAt = useCallback((x: number, y: number) => {
