@@ -1,5 +1,14 @@
 # Genie Assistant Changelog
 
+## [V1.027] - 2026-05-02
+
+### 🔄 로그아웃 → 랜딩페이지 리다이렉트
+- **Summary**: 로그아웃 및 미인증 접근 시 `/login` 대신 `/landing`으로 이동
+- **Detail**:
+  - ✅ `src/utils/supabase/middleware.ts`: 미인증 리다이렉트 `/login` → `/landing`
+  - ✅ `src/components/layout/Header.tsx`: 로그아웃 버튼 리다이렉트 `/login` → `/landing`
+- **Build Time**: 2026-05-02
+
 ## [V1.026] - 2026-05-02
 
 ### 🎵 캐릭터 관계도 Chord 다이어그램 + iPad 호환
