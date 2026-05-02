@@ -6,7 +6,8 @@ import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Bot, Loader2, CheckCircle2 } from 'lucide-react';
+import { Loader2, CheckCircle2 } from 'lucide-react';
+import { PildongLogoImg } from '@/components/shared/PildongLogoImg';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -75,8 +76,8 @@ export default function RegisterPage() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-2 w-12 h-12 rounded-lg bg-accent flex items-center justify-center">
-            <Bot className="w-6 h-6 text-accent-foreground" />
+          <div className="mx-auto mb-2 flex items-center justify-center">
+            <PildongLogoImg size={36} />
           </div>
           <CardTitle className="text-xl font-serif font-normal">회원가입</CardTitle>
           <CardDescription>새 계정을 만드세요</CardDescription>

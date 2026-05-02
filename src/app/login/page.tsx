@@ -6,7 +6,8 @@ import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Bot, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import { PildongLogoImg } from '@/components/shared/PildongLogoImg';
 import { APP_VERSION } from '@/lib/version';
 
 export default function LoginPage() {
@@ -49,10 +50,10 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-2 w-12 h-12 rounded-lg bg-accent flex items-center justify-center">
-            <Bot className="w-6 h-6 text-accent-foreground" />
+          <div className="mx-auto mb-2 flex items-center justify-center">
+            <PildongLogoImg size={36} />
           </div>
-          <CardTitle className="text-xl font-serif font-normal">Genie Assistant</CardTitle>
+          <CardTitle className="text-xl font-serif font-normal">필동</CardTitle>
           <p className="text-xs text-muted-foreground font-mono">{APP_VERSION}</p>
           <CardDescription>로그인하여 시작하세요</CardDescription>
         </CardHeader>

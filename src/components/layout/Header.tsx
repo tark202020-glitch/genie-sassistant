@@ -3,6 +3,7 @@
 import { PanelLeft, Bot, X, BarChart3, Users, LogOut, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { PildongLogoImg } from '@/components/shared/PildongLogoImg';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,7 +39,8 @@ export function Header({
       )}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-serif font-normal text-foreground">Genie Assistant</h1>
+          <PildongLogoImg size={28} />
+          <h1 className="text-2xl font-serif font-normal text-foreground">필동</h1>
           <span className="text-xs text-muted-foreground font-mono">{APP_VERSION}</span>
         </div>
         {activeAssistant ? (

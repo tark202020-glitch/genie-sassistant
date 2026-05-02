@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { PildongLogo } from '@/components/shared/PildongLogo';
+import { PildongLogoImg } from '@/components/shared/PildongLogoImg';
 import {
   BookOpen,
   PenLine,
@@ -25,7 +25,7 @@ function Nav() {
     <nav className="sticky top-0 z-50 bg-background/90 backdrop-blur border-b border-border">
       <div className="max-w-[1200px] mx-auto px-6 h-16 flex items-center justify-between">
         <Link href="/landing" className="flex items-center gap-2">
-          <PildongLogo size={28} className="text-foreground" />
+          <PildongLogoImg size={28} />
           <span className="text-xl font-serif font-normal text-foreground">필동</span>
         </Link>
         <div className="flex items-center gap-3">
@@ -503,7 +503,7 @@ function FinalCTA() {
       <footer className="border-t border-border py-8">
         <div className="max-w-[1200px] mx-auto px-6 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <PildongLogo size={18} className="text-muted-foreground" />
+            <PildongLogoImg size={18} />
             <span className="text-sm text-muted-foreground">© 2026 필동 (Pildong)</span>
           </div>
           <div className="flex items-center gap-4 text-xs text-muted-foreground">
