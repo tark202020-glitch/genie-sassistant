@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Loader2, RefreshCw, FileText } from 'lucide-react';
+import { Loader2, RefreshCw, FileText, Save, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { EpisodeCard } from './EpisodeCard';
 import type { EpisodeSummary } from '@/types/script-organizer';
@@ -14,6 +14,9 @@ export function EpisodeSummaryTab({ assistantId }: EpisodeSummaryTabProps) {
   const [summaries, setSummaries] = useState<EpisodeSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [unsaved, setUnsaved] = useState(false);
   const [error, setError] = useState('');
 
   const loadCached = useCallback(async () => {
@@ -22,6 +25,8 @@ export function EpisodeSummaryTab({ assistantId }: EpisodeSummaryTabProps) {
       const data = await res.json();
       if (data.analyses && data.analyses.length > 0) {
         setSummaries(data.analyses[0].data as EpisodeSummary[]);
+        setSaved(true);
+        setUnsaved(false);
         return true;
       }
       return false;
@@ -46,6 +51,8 @@ export function EpisodeSummaryTab({ assistantId }: EpisodeSummaryTabProps) {
       const data = await res.json();
       if (data.success) {
         setSummaries(data.data);
+        setSaved(false);
+        setUnsaved(true);
       } else {
         setError(data.error || '분석 실패');
       }
@@ -55,6 +62,32 @@ export function EpisodeSummaryTab({ assistantId }: EpisodeSummaryTabProps) {
       setAnalyzing(false);
     }
   }, [assistantId]);
+
+  // 수동 저장
+  const saveToDb = useCallback(async () => {
+    if (summaries.length === 0) return;
+    setSaving(true);
+    try {
+      const res = await fetch('/api/script-analyses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          assistantId,
+          analysisType: 'episodes',
+          name: '자동 저장',
+          data: summaries,
+        }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || '저장 실패');
+      setSaved(true);
+      setUnsaved(false);
+    } catch (err: any) {
+      setError(`저장 실패: ${err.message}`);
+    } finally {
+      setSaving(false);
+    }
+  }, [assistantId, summaries]);
 
   useEffect(() => {
     (async () => {
@@ -78,7 +111,6 @@ export function EpisodeSummaryTab({ assistantId }: EpisodeSummaryTabProps) {
       <div className="flex flex-col items-center justify-center py-20 gap-4">
         <Loader2 className="w-10 h-10 text-amber-400 animate-spin" />
         <p className="text-white/60">화별 요약 분석 중... (대본 수에 따라 1~3분 소요)</p>
-        <p className="text-white/30 text-xs">완료 후 자동 저장됩니다</p>
       </div>
     );
   }
@@ -87,7 +119,7 @@ export function EpisodeSummaryTab({ assistantId }: EpisodeSummaryTabProps) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-4">
         <p className="text-red-400">{error}</p>
-        <Button variant="outline" onClick={analyze} className="bg-white/5 border-white/10 text-white/80">
+        <Button variant="outline" onClick={() => { setError(''); analyze(); }} className="bg-white/5 border-white/10 text-white/80">
           <RefreshCw className="w-4 h-4 mr-1.5" />
           다시 시도
         </Button>
@@ -115,23 +147,45 @@ export function EpisodeSummaryTab({ assistantId }: EpisodeSummaryTabProps) {
 
   return (
     <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
         <div className="flex items-center gap-3">
           <h2 className="text-lg font-semibold text-white/90">화별 요약</h2>
           <span className="text-xs text-white/40 bg-white/5 px-2.5 py-1 rounded-full">
             {summaries.length}화
           </span>
+          {saved && (
+            <span className="flex items-center gap-1 text-green-400 text-xs">
+              <CheckCircle2 className="w-3.5 h-3.5" /> 저장됨
+            </span>
+          )}
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={analyze}
-          disabled={analyzing}
-          className="bg-white/5 border-white/10 text-white/70 hover:bg-white/10"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${analyzing ? 'animate-spin' : ''}`} />
-          다시 분석
-        </Button>
+        <div className="flex items-center gap-2">
+          {unsaved && (
+            <Button
+              size="sm"
+              onClick={saveToDb}
+              disabled={saving}
+              className="bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/30"
+            >
+              {saving ? (
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+              ) : (
+                <Save className="w-3.5 h-3.5 mr-1.5" />
+              )}
+              저장하기
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={analyze}
+            disabled={analyzing}
+            className="bg-white/5 border-white/10 text-white/70 hover:bg-white/10"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${analyzing ? 'animate-spin' : ''}`} />
+            다시 분석
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

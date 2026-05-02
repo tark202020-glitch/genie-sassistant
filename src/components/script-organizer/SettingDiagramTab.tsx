@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Loader2, RefreshCw, MapPin } from 'lucide-react';
+import { Loader2, RefreshCw, MapPin, Save, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import type { SettingGraphData, SettingNode, SettingEdge } from '@/types/script-organizer';
+import type { SettingGraphData, SettingNode } from '@/types/script-organizer';
 
 const TYPE_ORDER: Array<SettingNode['type']> = ['indoor', 'outdoor', 'vehicle', 'virtual', 'other'];
 
@@ -39,6 +39,9 @@ export function SettingDiagramTab({ assistantId }: SettingDiagramTabProps) {
   const [graphData, setGraphData] = useState<SettingGraphData | null>(null);
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [unsaved, setUnsaved] = useState(false);
   const [error, setError] = useState('');
 
   const loadCached = useCallback(async () => {
@@ -47,6 +50,8 @@ export function SettingDiagramTab({ assistantId }: SettingDiagramTabProps) {
       const data = await res.json();
       if (data.analyses && data.analyses.length > 0) {
         setGraphData(data.analyses[0].data as SettingGraphData);
+        setSaved(true);
+        setUnsaved(false);
         return true;
       }
       return false;
@@ -71,6 +76,8 @@ export function SettingDiagramTab({ assistantId }: SettingDiagramTabProps) {
       const data = await res.json();
       if (data.success) {
         setGraphData(data.data);
+        setSaved(false);
+        setUnsaved(true);
       } else {
         setError(data.error || '분석 실패');
       }
@@ -80,6 +87,32 @@ export function SettingDiagramTab({ assistantId }: SettingDiagramTabProps) {
       setAnalyzing(false);
     }
   }, [assistantId]);
+
+  // 수동 저장
+  const saveToDb = useCallback(async () => {
+    if (!graphData) return;
+    setSaving(true);
+    try {
+      const res = await fetch('/api/script-analyses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          assistantId,
+          analysisType: 'settings',
+          name: '자동 저장',
+          data: graphData,
+        }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || '저장 실패');
+      setSaved(true);
+      setUnsaved(false);
+    } catch (err: any) {
+      setError(`저장 실패: ${err.message}`);
+    } finally {
+      setSaving(false);
+    }
+  }, [assistantId, graphData]);
 
   useEffect(() => {
     (async () => {
@@ -116,7 +149,6 @@ export function SettingDiagramTab({ assistantId }: SettingDiagramTabProps) {
       if (!byType.has(node.type)) byType.set(node.type, []);
       byType.get(node.type)!.push(node);
     }
-    // Sort each group by frequency descending
     for (const nodes of byType.values()) {
       nodes.sort((a, b) => b.frequency - a.frequency);
     }
@@ -137,7 +169,6 @@ export function SettingDiagramTab({ assistantId }: SettingDiagramTabProps) {
       <div className="flex flex-col items-center justify-center h-full gap-4">
         <Loader2 className="w-10 h-10 text-indigo-400 animate-spin" />
         <p className="text-white/60">배경/공간 분석 중... (1~2분 소요)</p>
-        <p className="text-white/30 text-xs">완료 후 자동 저장됩니다</p>
       </div>
     );
   }
@@ -146,7 +177,7 @@ export function SettingDiagramTab({ assistantId }: SettingDiagramTabProps) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4">
         <p className="text-red-400">{error}</p>
-        <Button variant="outline" onClick={analyze} className="bg-white/5 border-white/10 text-white/80">
+        <Button variant="outline" onClick={() => { setError(''); analyze(); }} className="bg-white/5 border-white/10 text-white/80">
           <RefreshCw className="w-4 h-4 mr-1.5" />
           다시 시도
         </Button>
@@ -175,22 +206,44 @@ export function SettingDiagramTab({ assistantId }: SettingDiagramTabProps) {
   return (
     <div className="h-full flex flex-col">
       {/* Stats bar */}
-      <div className="flex items-center justify-between px-6 py-3 border-b border-white/5">
+      <div className="flex items-center justify-between px-6 py-3 border-b border-white/5 flex-wrap gap-2">
         <div className="flex items-center gap-4 text-sm text-white/60">
           <span>장소 <b className="text-indigo-400">{graphData.stats.totalLocations}</b></span>
           <span>관계 <b className="text-blue-400">{graphData.stats.totalRelationships}</b></span>
           <span>분석 대본 <b className="text-amber-400">{graphData.stats.analyzedScripts}</b></span>
+          {saved && (
+            <span className="flex items-center gap-1 text-green-400 text-xs">
+              <CheckCircle2 className="w-3.5 h-3.5" /> 저장됨
+            </span>
+          )}
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={analyze}
-          disabled={analyzing}
-          className="bg-white/5 border-white/10 text-white/70 hover:bg-white/10"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${analyzing ? 'animate-spin' : ''}`} />
-          다시 분석
-        </Button>
+        <div className="flex items-center gap-2">
+          {unsaved && (
+            <Button
+              size="sm"
+              onClick={saveToDb}
+              disabled={saving}
+              className="bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/30"
+            >
+              {saving ? (
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+              ) : (
+                <Save className="w-3.5 h-3.5 mr-1.5" />
+              )}
+              저장하기
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={analyze}
+            disabled={analyzing}
+            className="bg-white/5 border-white/10 text-white/70 hover:bg-white/10"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${analyzing ? 'animate-spin' : ''}`} />
+            다시 분석
+          </Button>
+        </div>
       </div>
 
       {/* Scrollable location listing */}
@@ -199,7 +252,6 @@ export function SettingDiagramTab({ assistantId }: SettingDiagramTabProps) {
           const meta = TYPE_META[type];
           return (
             <section key={type}>
-              {/* Section header */}
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-lg">{meta.icon}</span>
                 <h3 className={`font-semibold text-base ${meta.headerClass}`}>{meta.label}</h3>
@@ -208,7 +260,6 @@ export function SettingDiagramTab({ assistantId }: SettingDiagramTabProps) {
                 </span>
               </div>
 
-              {/* Location cards */}
               <div className="grid gap-3">
                 {nodes.map((node) => {
                   const rels = relMap.get(node.id) ?? [];
@@ -217,7 +268,6 @@ export function SettingDiagramTab({ assistantId }: SettingDiagramTabProps) {
                       key={node.id}
                       className="bg-[#12122a]/80 border border-white/10 rounded-xl p-4"
                     >
-                      {/* Name + frequency */}
                       <div className="flex items-start justify-between gap-2 mb-1">
                         <span className="text-white font-medium text-base">{node.label}</span>
                         <span className="shrink-0 px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-medium">
@@ -225,12 +275,10 @@ export function SettingDiagramTab({ assistantId }: SettingDiagramTabProps) {
                         </span>
                       </div>
 
-                      {/* Description */}
                       {node.description && (
                         <p className="text-white/60 text-sm mb-2">{node.description}</p>
                       )}
 
-                      {/* Episode pills */}
                       {node.episodes.length > 0 && (
                         <div className="flex flex-wrap gap-1.5 mb-2">
                           {node.episodes.map((ep) => (
@@ -244,7 +292,6 @@ export function SettingDiagramTab({ assistantId }: SettingDiagramTabProps) {
                         </div>
                       )}
 
-                      {/* Related locations */}
                       {rels.length > 0 && (
                         <div className="mt-2 pt-2 border-t border-white/5 space-y-1">
                           {rels.map((r, i) => (

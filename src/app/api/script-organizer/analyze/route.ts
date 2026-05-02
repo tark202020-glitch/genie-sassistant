@@ -191,7 +191,6 @@ ${combinedText}`;
         },
       };
 
-      await autoSave(assistantId, 'settings', data);
       return NextResponse.json({ success: true, data });
 
     } else if (analysisType === 'episodes') {
@@ -255,10 +254,6 @@ ${scriptText}`;
       }
 
       summaries.sort((a, b) => a.episode - b.episode);
-
-      if (summaries.length > 0) {
-        await autoSave(assistantId, 'episodes', summaries);
-      }
 
       return NextResponse.json({
         success: true,
