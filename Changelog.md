@@ -1,5 +1,19 @@
 # Genie Assistant Changelog
 
+## [V1.028] - 2026-05-02
+
+### 🎨 로고 이미지 다크/라이트 모드 적용
+- **Summary**: PNG 로고(logo_B.png, logo_W.png)를 다크/라이트 테마에 따라 자동 전환하는 PildongLogoImg 컴포넌트 추가
+- **Detail**:
+  - ✅ `src/components/shared/PildongLogoImg.tsx`: next-themes 기반 테마 전환 이미지 로고 컴포넌트 (SSR 안전)
+  - ✅ `src/components/layout/Header.tsx`: 텍스트 "Genie Assistant" → 로고 이미지 + "필동"
+  - ✅ `src/app/landing/page.tsx`: SVG PildongLogo → PNG PildongLogoImg 교체 (Nav, Footer)
+  - ✅ `src/app/login/page.tsx`: Bot 아이콘 → 로고 이미지, "Genie Assistant" → "필동"
+  - ✅ `src/app/register/page.tsx`: Bot 아이콘 → 로고 이미지
+  - ✅ `public/logo_B.png`: 라이트 모드용 (검정 로고)
+  - ✅ `public/logo_W.png`: 다크 모드용 (흰색 로고)
+- **Build Time**: 2026-05-02
+
 ## [V1.027] - 2026-05-02
 
 ### 🔄 로그아웃 → 랜딩페이지 리다이렉트
