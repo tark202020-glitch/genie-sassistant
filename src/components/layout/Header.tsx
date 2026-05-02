@@ -106,7 +106,7 @@ export function Header({
         title="로그아웃"
         onClick={async () => {
           await fetch('/api/auth/logout', { method: 'POST' });
-          window.location.href = '/login';
+          window.location.href = '/landing';
         }}
       >
         <LogOut className="w-4 h-4" />

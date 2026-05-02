@@ -10,7 +10,7 @@ export async function updateSession(request: NextRequest) {
   const sessionToken = request.cookies.get('genie_session')?.value;
 
   if (!sessionToken) {
-    const loginUrl = new URL('/login', request.url);
+    const loginUrl = new URL('/landing', request.url);
     return NextResponse.redirect(loginUrl);
   }
 
