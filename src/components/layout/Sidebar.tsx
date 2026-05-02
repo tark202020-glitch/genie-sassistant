@@ -81,11 +81,13 @@ export function Sidebar({
           onNewConversation={onNewConversation}
         />
 
-        {/* 3. 학습자료 관리 (접힌 섹션) */}
-        <DocumentsSection
-          documents={documents}
-          assistantsHook={assistantsHook}
-        />
+        {/* 3. 학습자료 관리 (접힌 섹션 — flex-shrink-0으로 충분한 공간 확보) */}
+        <div className="flex-shrink-0 max-h-[50%] flex flex-col overflow-hidden">
+          <DocumentsSection
+            documents={documents}
+            assistantsHook={assistantsHook}
+          />
+        </div>
       </div>
     </aside>
   );

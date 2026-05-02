@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { ChevronRight, ChevronDown, FolderOpen, Upload, FileText, Scroll, BookOpen, Trash2, ChevronUp } from 'lucide-react';
+import { useState } from 'react';
+import { ChevronRight, ChevronDown, FolderOpen, Upload, FileText, Scroll, BookOpen, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -19,7 +19,6 @@ interface DocumentsSectionProps {
 
 export function DocumentsSection({ documents, assistantsHook }: DocumentsSectionProps) {
   const [expanded, setExpanded] = useState(false);
-  const [showAll, setShowAll] = useState(false);
   const [confirmDoc, setConfirmDoc] = useState<LearnedDocument | null>(null);
   const [confirmSource, setConfirmSource] = useState<'shared' | 'assistant'>('shared');
   const [summaryDoc, setSummaryDoc] = useState<LearnedDocument | null>(null);
@@ -29,11 +28,6 @@ export function DocumentsSection({ documents, assistantsHook }: DocumentsSection
   const scripts = assistantDocs.filter((d) => d.docType !== 'reference');
   const references = assistantDocs.filter((d) => d.docType === 'reference');
 
-  // 보조작가 전환 시 showAll 리셋
-  useEffect(() => {
-    setShowAll(false);
-  }, [activeAssistant?.id]);
-
   // 모드별 요약 텍스트
   const summaryText = activeAssistant
     ? (assistantDocs.length > 0
@@ -41,15 +35,12 @@ export function DocumentsSection({ documents, assistantsHook }: DocumentsSection
         : '없음')
     : (documents.documents.length > 0 ? `${documents.documents.length}개 자료` : '없음');
 
-  // 현재 모드의 문서 수
-  const docCount = activeAssistant ? assistantDocs.length : documents.documents.length;
-
   return (
-    <div className="border-t border-border">
+    <div className="border-t border-border flex flex-col overflow-hidden">
       {/* 접힌 헤더 */}
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full px-3 py-2.5 flex items-center justify-between hover:bg-muted/50 transition-colors"
+        className="w-full px-3 py-2.5 flex items-center justify-between hover:bg-muted/50 transition-colors flex-shrink-0"
       >
         <div className="flex items-center gap-1.5 min-w-0">
           {expanded ? (
@@ -69,15 +60,14 @@ export function DocumentsSection({ documents, assistantsHook }: DocumentsSection
       </button>
 
       {expanded && (
-        <div className="border-t border-border/50">
+        <div className="border-t border-border/50 flex-1 overflow-hidden flex flex-col min-h-0">
           <div
             key={activeAssistant?.id ?? 'shared'}
-            className="animate-in fade-in duration-200"
+            className="animate-in fade-in duration-200 flex-1 overflow-hidden flex flex-col min-h-0"
           >
             {activeAssistant ? (
               <AssistantDocContent
                 assistantsHook={assistantsHook}
-                showAll={showAll}
                 onDeleteRequest={(doc) => {
                   setConfirmDoc(doc);
                   setConfirmSource('assistant');
@@ -87,7 +77,6 @@ export function DocumentsSection({ documents, assistantsHook }: DocumentsSection
             ) : (
               <SharedDocContent
                 documents={documents}
-                showAll={showAll}
                 onDeleteRequest={(doc) => {
                   setConfirmDoc(doc);
                   setConfirmSource('shared');
@@ -96,25 +85,6 @@ export function DocumentsSection({ documents, assistantsHook }: DocumentsSection
               />
             )}
           </div>
-
-          {/* 더 보기 토글 */}
-          {docCount > 6 && (
-            <div className="px-3 py-1.5 border-t border-border/30">
-              <button
-                onClick={() => setShowAll(!showAll)}
-                className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-1"
-              >
-                {showAll ? (
-                  <>
-                    <ChevronUp className="w-3 h-3" />
-                    접기
-                  </>
-                ) : (
-                  `+${docCount - 6}개 더 보기`
-                )}
-              </button>
-            </div>
-          )}
         </div>
       )}
 
@@ -149,19 +119,17 @@ export function DocumentsSection({ documents, assistantsHook }: DocumentsSection
 
 function SharedDocContent({
   documents,
-  showAll,
   onDeleteRequest,
   onDocClick,
 }: {
   documents: ReturnType<typeof useDocuments>;
-  showAll: boolean;
   onDeleteRequest: (doc: LearnedDocument) => void;
   onDocClick: (doc: LearnedDocument) => void;
 }) {
   return (
-    <div className={`${showAll ? 'max-h-[50vh]' : 'max-h-80'} flex flex-col transition-all duration-300`}>
+    <div className="flex-1 flex flex-col overflow-hidden min-h-0">
       {/* 업로드 */}
-      <div className="px-3 py-2">
+      <div className="px-3 py-2 flex-shrink-0">
         <input
           ref={documents.fileInputRef}
           type="file"
@@ -220,12 +188,10 @@ function SharedDocContent({
 
 function AssistantDocContent({
   assistantsHook,
-  showAll,
   onDeleteRequest,
   onDocClick,
 }: {
   assistantsHook: ReturnType<typeof useAssistants>;
-  showAll: boolean;
   onDeleteRequest: (doc: LearnedDocument) => void;
   onDocClick: (doc: LearnedDocument) => void;
 }) {
@@ -233,9 +199,9 @@ function AssistantDocContent({
   const references = assistantsHook.assistantDocs.filter((d) => d.docType === 'reference');
 
   return (
-    <div className={`${showAll ? 'max-h-[50vh]' : 'max-h-80'} flex flex-col transition-all duration-300`}>
+    <div className="flex-1 flex flex-col overflow-hidden min-h-0">
       {/* 업로드 */}
-      <div className="px-3 py-2">
+      <div className="px-3 py-2 flex-shrink-0">
         <div className="flex gap-1 mb-1.5">
           <Button
             variant={assistantsHook.assistantDocType === 'script' ? 'default' : 'ghost'}

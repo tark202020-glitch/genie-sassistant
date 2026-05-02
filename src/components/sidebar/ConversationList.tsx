@@ -45,7 +45,7 @@ export function ConversationList({
   const confirmConv = conversations.find(c => c.id === confirmId);
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 flex flex-col overflow-hidden min-h-0">
       <div className="px-3 pt-3 pb-2">
         <Button
           variant="outline"
