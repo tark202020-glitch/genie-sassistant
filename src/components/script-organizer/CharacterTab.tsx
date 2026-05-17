@@ -136,7 +136,7 @@ export function CharacterTab({ assistantId }: CharacterTabProps) {
     return (
       <div className="flex flex-col items-center justify-center h-full min-h-[400px] gap-4">
         <Loader2 className="w-10 h-10 text-rose-400 animate-spin" />
-        <p className="text-white/60">저장된 데이터 불러오는 중...</p>
+        <p className="text-muted-foreground">저장된 데이터 불러오는 중...</p>
       </div>
     );
   }
@@ -145,7 +145,7 @@ export function CharacterTab({ assistantId }: CharacterTabProps) {
     return (
       <div className="flex flex-col items-center justify-center h-full min-h-[400px] gap-4">
         <Loader2 className="w-10 h-10 text-rose-400 animate-spin" />
-        <p className="text-white/60">캐릭터 분석 중... (1~2분 소요)</p>
+        <p className="text-muted-foreground">캐릭터 분석 중... (1~2분 소요)</p>
       </div>
     );
   }
@@ -154,7 +154,7 @@ export function CharacterTab({ assistantId }: CharacterTabProps) {
     return (
       <div className="flex flex-col items-center justify-center h-full min-h-[400px] gap-4">
         <p className="text-red-400">{error}</p>
-        <Button variant="outline" onClick={() => { setError(''); analyze(); }} className="bg-white/5 border-white/10 text-white/80">
+        <Button variant="outline" onClick={() => { setError(''); analyze(); }} className="bg-secondary/50 border-border text-foreground/80">
           <RefreshCw className="w-4 h-4 mr-1.5" />
           다시 시도
         </Button>
@@ -165,9 +165,9 @@ export function CharacterTab({ assistantId }: CharacterTabProps) {
   if (!graphData || graphData.nodes.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full min-h-[400px] gap-4">
-        <Users className="w-12 h-12 text-white/30" />
-        <p className="text-white/50">캐릭터 분석 데이터가 없습니다.</p>
-        <p className="text-white/30 text-xs">아래 버튼을 눌러 AI 분석을 시작하세요. (1~2분 소요)</p>
+        <Users className="w-12 h-12 text-muted-foreground/50" />
+        <p className="text-muted-foreground/70">캐릭터 분석 데이터가 없습니다.</p>
+        <p className="text-muted-foreground/50 text-xs">아래 버튼을 눌러 AI 분석을 시작하세요. (1~2분 소요)</p>
         <Button
           onClick={analyze}
           disabled={analyzing}
@@ -183,8 +183,8 @@ export function CharacterTab({ assistantId }: CharacterTabProps) {
   return (
     <div className="h-full flex flex-col" style={{ minHeight: 'calc(100vh - 140px)' }}>
       {/* 툴바 */}
-      <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-white/5 flex-wrap gap-2">
-        <div className="flex items-center gap-3 sm:gap-4 text-xs sm:text-sm text-white/60">
+      <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-border flex-wrap gap-2">
+        <div className="flex items-center gap-3 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
           <span>캐릭터 <b className="text-rose-400">{graphData.stats.totalCharacters}</b></span>
           <span>관계 <b className="text-pink-400">{graphData.stats.totalRelationships}</b></span>
           <span>대본 <b className="text-amber-400">{graphData.stats.analyzedScripts}</b></span>
@@ -215,7 +215,7 @@ export function CharacterTab({ assistantId }: CharacterTabProps) {
             size="sm"
             onClick={analyze}
             disabled={analyzing}
-            className="bg-white/5 border-white/10 text-white/70 hover:bg-white/10"
+            className="bg-secondary/50 border-border text-foreground/70 hover:bg-secondary"
           >
             <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${analyzing ? 'animate-spin' : ''}`} />
             <span className="hidden sm:inline">다시 분석</span>
@@ -240,11 +240,11 @@ export function CharacterTab({ assistantId }: CharacterTabProps) {
             return (
               <div
                 key={node.id}
-                className="bg-[#12122a]/80 border border-white/10 rounded-xl p-4"
+                className="bg-card border border-border rounded-xl p-4"
               >
                 {/* Header */}
                 <div className="flex items-start gap-2 flex-wrap mb-3">
-                  <span className="text-white font-bold text-lg">{node.label}</span>
+                  <span className="text-foreground font-bold text-lg">{node.label}</span>
                   <span className={`${badge.bg} ${badge.text} text-xs font-medium px-2 py-0.5 rounded-full`}>
                     {node.role}
                   </span>
@@ -256,7 +256,7 @@ export function CharacterTab({ assistantId }: CharacterTabProps) {
                     {node.episodes.map((ep) => (
                       <span
                         key={ep}
-                        className="bg-white/5 text-white/50 text-[10px] px-1.5 py-0.5 rounded"
+                        className="bg-secondary/50 text-muted-foreground/70 text-[10px] px-1.5 py-0.5 rounded"
                       >
                         {ep}화
                       </span>
@@ -270,8 +270,8 @@ export function CharacterTab({ assistantId }: CharacterTabProps) {
                     if (!value || value === '불명') return null;
                     return (
                       <div key={label} className="flex gap-2">
-                        <span className="text-white/40 text-xs shrink-0 pt-0.5">{label}</span>
-                        <span className="text-white/80 text-sm">{value}</span>
+                        <span className="text-muted-foreground/60 text-xs shrink-0 pt-0.5">{label}</span>
+                        <span className="text-foreground/80 text-sm">{value}</span>
                       </div>
                     );
                   })}

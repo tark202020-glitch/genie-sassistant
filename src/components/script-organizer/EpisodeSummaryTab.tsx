@@ -101,7 +101,7 @@ export function EpisodeSummaryTab({ assistantId }: EpisodeSummaryTabProps) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-4">
         <Loader2 className="w-10 h-10 text-amber-400 animate-spin" />
-        <p className="text-white/60">저장된 데이터 불러오는 중...</p>
+        <p className="text-muted-foreground">저장된 데이터 불러오는 중...</p>
       </div>
     );
   }
@@ -110,7 +110,7 @@ export function EpisodeSummaryTab({ assistantId }: EpisodeSummaryTabProps) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-4">
         <Loader2 className="w-10 h-10 text-amber-400 animate-spin" />
-        <p className="text-white/60">화별 요약 분석 중... (대본 수에 따라 1~3분 소요)</p>
+        <p className="text-muted-foreground">화별 요약 분석 중... (대본 수에 따라 1~3분 소요)</p>
       </div>
     );
   }
@@ -119,7 +119,7 @@ export function EpisodeSummaryTab({ assistantId }: EpisodeSummaryTabProps) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-4">
         <p className="text-red-400">{error}</p>
-        <Button variant="outline" onClick={() => { setError(''); analyze(); }} className="bg-white/5 border-white/10 text-white/80">
+        <Button variant="outline" onClick={() => { setError(''); analyze(); }} className="bg-secondary/50 border-border text-foreground/80">
           <RefreshCw className="w-4 h-4 mr-1.5" />
           다시 시도
         </Button>
@@ -130,9 +130,9 @@ export function EpisodeSummaryTab({ assistantId }: EpisodeSummaryTabProps) {
   if (summaries.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-4">
-        <FileText className="w-12 h-12 text-white/30" />
-        <p className="text-white/50">화별 요약 데이터가 없습니다.</p>
-        <p className="text-white/30 text-xs">아래 버튼을 눌러 AI 분석을 시작하세요. (대본 수에 따라 1~3분 소요)</p>
+        <FileText className="w-12 h-12 text-muted-foreground/50" />
+        <p className="text-muted-foreground/70">화별 요약 데이터가 없습니다.</p>
+        <p className="text-muted-foreground/50 text-xs">아래 버튼을 눌러 AI 분석을 시작하세요. (대본 수에 따라 1~3분 소요)</p>
         <Button
           onClick={analyze}
           disabled={analyzing}
@@ -149,8 +149,8 @@ export function EpisodeSummaryTab({ assistantId }: EpisodeSummaryTabProps) {
     <div className="p-6">
       <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
         <div className="flex items-center gap-3">
-          <h2 className="text-lg font-semibold text-white/90">화별 요약</h2>
-          <span className="text-xs text-white/40 bg-white/5 px-2.5 py-1 rounded-full">
+          <h2 className="text-lg font-semibold text-foreground/90">화별 요약</h2>
+          <span className="text-xs text-muted-foreground/60 bg-secondary/50 px-2.5 py-1 rounded-full">
             {summaries.length}화
           </span>
           {saved && (
@@ -180,7 +180,7 @@ export function EpisodeSummaryTab({ assistantId }: EpisodeSummaryTabProps) {
             size="sm"
             onClick={analyze}
             disabled={analyzing}
-            className="bg-white/5 border-white/10 text-white/70 hover:bg-white/10"
+            className="bg-secondary/50 border-border text-foreground/70 hover:bg-white/10"
           >
             <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${analyzing ? 'animate-spin' : ''}`} />
             다시 분석

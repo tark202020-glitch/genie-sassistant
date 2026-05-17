@@ -159,7 +159,7 @@ export function SettingDiagramTab({ assistantId }: SettingDiagramTabProps) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4">
         <Loader2 className="w-10 h-10 text-indigo-400 animate-spin" />
-        <p className="text-white/60">저장된 데이터 불러오는 중...</p>
+        <p className="text-muted-foreground">저장된 데이터 불러오는 중...</p>
       </div>
     );
   }
@@ -168,7 +168,7 @@ export function SettingDiagramTab({ assistantId }: SettingDiagramTabProps) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4">
         <Loader2 className="w-10 h-10 text-indigo-400 animate-spin" />
-        <p className="text-white/60">배경/공간 분석 중... (1~2분 소요)</p>
+        <p className="text-muted-foreground">배경/공간 분석 중... (1~2분 소요)</p>
       </div>
     );
   }
@@ -177,7 +177,7 @@ export function SettingDiagramTab({ assistantId }: SettingDiagramTabProps) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4">
         <p className="text-red-400">{error}</p>
-        <Button variant="outline" onClick={() => { setError(''); analyze(); }} className="bg-white/5 border-white/10 text-white/80">
+        <Button variant="outline" onClick={() => { setError(''); analyze(); }} className="bg-secondary/50 border-border text-foreground/80">
           <RefreshCw className="w-4 h-4 mr-1.5" />
           다시 시도
         </Button>
@@ -188,9 +188,9 @@ export function SettingDiagramTab({ assistantId }: SettingDiagramTabProps) {
   if (!graphData || graphData.nodes.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4">
-        <MapPin className="w-12 h-12 text-white/30" />
-        <p className="text-white/50">배경 분석 데이터가 없습니다.</p>
-        <p className="text-white/30 text-xs">아래 버튼을 눌러 AI 분석을 시작하세요. (1~2분 소요)</p>
+        <MapPin className="w-12 h-12 text-muted-foreground/50" />
+        <p className="text-muted-foreground/70">배경 분석 데이터가 없습니다.</p>
+        <p className="text-muted-foreground/50 text-xs">아래 버튼을 눌러 AI 분석을 시작하세요. (1~2분 소요)</p>
         <Button
           onClick={analyze}
           disabled={analyzing}
@@ -206,8 +206,8 @@ export function SettingDiagramTab({ assistantId }: SettingDiagramTabProps) {
   return (
     <div className="h-full flex flex-col">
       {/* Stats bar */}
-      <div className="flex items-center justify-between px-6 py-3 border-b border-white/5 flex-wrap gap-2">
-        <div className="flex items-center gap-4 text-sm text-white/60">
+      <div className="flex items-center justify-between px-6 py-3 border-b border-border flex-wrap gap-2">
+        <div className="flex items-center gap-4 text-sm text-muted-foreground">
           <span>장소 <b className="text-indigo-400">{graphData.stats.totalLocations}</b></span>
           <span>관계 <b className="text-blue-400">{graphData.stats.totalRelationships}</b></span>
           <span>분석 대본 <b className="text-amber-400">{graphData.stats.analyzedScripts}</b></span>
@@ -238,7 +238,7 @@ export function SettingDiagramTab({ assistantId }: SettingDiagramTabProps) {
             size="sm"
             onClick={analyze}
             disabled={analyzing}
-            className="bg-white/5 border-white/10 text-white/70 hover:bg-white/10"
+            className="bg-secondary/50 border-border text-foreground/70 hover:bg-secondary"
           >
             <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${analyzing ? 'animate-spin' : ''}`} />
             다시 분석
@@ -255,7 +255,7 @@ export function SettingDiagramTab({ assistantId }: SettingDiagramTabProps) {
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-lg">{meta.icon}</span>
                 <h3 className={`font-semibold text-base ${meta.headerClass}`}>{meta.label}</h3>
-                <span className="ml-1 px-2 py-0.5 rounded-full bg-white/10 text-white/50 text-xs font-medium">
+                <span className="ml-1 px-2 py-0.5 rounded-full bg-secondary text-muted-foreground/70 text-xs font-medium">
                   {nodes.length}
                 </span>
               </div>
@@ -266,17 +266,17 @@ export function SettingDiagramTab({ assistantId }: SettingDiagramTabProps) {
                   return (
                     <div
                       key={node.id}
-                      className="bg-[#12122a]/80 border border-white/10 rounded-xl p-4"
+                      className="bg-card border border-border rounded-xl p-4"
                     >
                       <div className="flex items-start justify-between gap-2 mb-1">
-                        <span className="text-white font-medium text-base">{node.label}</span>
+                        <span className="text-foreground font-medium text-base">{node.label}</span>
                         <span className="shrink-0 px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-medium">
                           등장 {node.frequency}회
                         </span>
                       </div>
 
                       {node.description && (
-                        <p className="text-white/60 text-sm mb-2">{node.description}</p>
+                        <p className="text-muted-foreground text-sm mb-2">{node.description}</p>
                       )}
 
                       {node.episodes.length > 0 && (
@@ -284,7 +284,7 @@ export function SettingDiagramTab({ assistantId }: SettingDiagramTabProps) {
                           {node.episodes.map((ep) => (
                             <span
                               key={ep}
-                              className="px-2 py-0.5 rounded-md bg-white/5 text-white/50 text-xs"
+                              className="px-2 py-0.5 rounded-md bg-secondary/50 text-muted-foreground/70 text-xs"
                             >
                               {ep}화
                             </span>
@@ -293,11 +293,11 @@ export function SettingDiagramTab({ assistantId }: SettingDiagramTabProps) {
                       )}
 
                       {rels.length > 0 && (
-                        <div className="mt-2 pt-2 border-t border-white/5 space-y-1">
+                        <div className="mt-2 pt-2 border-t border-border space-y-1">
                           {rels.map((r, i) => (
-                            <p key={i} className="text-white/40 text-xs">
+                            <p key={i} className="text-muted-foreground/60 text-xs">
                               {getRelArrow(r.relationship)} {r.targetLabel}{' '}
-                              <span className="text-white/30">({getRelLabel(r.relationship)})</span>
+                              <span className="text-muted-foreground/50">({getRelLabel(r.relationship)})</span>
                             </p>
                           ))}
                         </div>

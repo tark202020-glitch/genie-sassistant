@@ -16,11 +16,11 @@ function ScriptOrganizerContent() {
 
   if (!assistantId) {
     return (
-      <div className="min-h-screen bg-[#0a0a1a] flex items-center justify-center">
-        <div className="text-center bg-red-500/10 border border-red-500/20 rounded-xl p-8 max-w-md">
-          <p className="text-red-400 text-lg font-medium mb-2">보조작가 미선택</p>
-          <p className="text-red-300/70">메인 페이지에서 보조작가를 활성화한 후 이 페이지를 열어주세요.</p>
-          <a href="/" className="inline-block mt-4 text-indigo-400 hover:text-indigo-300 underline">
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center bg-destructive/10 border border-destructive/20 rounded-xl p-8 max-w-md">
+          <p className="text-destructive text-lg font-medium mb-2">보조작가 미선택</p>
+          <p className="text-destructive/70">메인 페이지에서 보조작가를 활성화한 후 이 페이지를 열어주세요.</p>
+          <a href="/" className="inline-block mt-4 text-ring hover:text-ring/80 underline">
             ← 메인으로 돌아가기
           </a>
         </div>
@@ -35,30 +35,30 @@ function ScriptOrganizerContent() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#0a0a1a] flex flex-col">
+    <div className="min-h-screen bg-background text-foreground flex flex-col">
       {/* 헤더 */}
-      <header className="flex items-center gap-4 px-6 py-4 border-b border-white/5 bg-[#0a0a1a]/90 backdrop-blur-md z-10">
+      <header className="flex items-center gap-4 px-6 py-4 border-b border-border bg-background/90 backdrop-blur-md z-10">
         <a
           href="/"
-          className="text-white/50 hover:text-white/80 transition text-sm flex items-center gap-1"
+          className="text-muted-foreground hover:text-foreground transition text-sm flex items-center gap-1"
         >
           <ArrowLeft className="w-4 h-4" /> 돌아가기
         </a>
-        <h1 className="text-xl font-bold bg-gradient-to-r from-amber-400 to-orange-400 bg-clip-text text-transparent">
+        <h1 className="text-xl font-bold text-ring">
           📖 대본 정리
         </h1>
       </header>
 
       {/* 탭 네비게이션 */}
-      <div className="flex items-center gap-1 px-6 py-2 border-b border-white/5 bg-[#0a0a1a]">
+      <div className="flex items-center gap-1 px-6 py-2 border-b border-border bg-background">
         {tabs.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
               activeTab === tab.key
-                ? 'bg-white/10 text-white border border-white/10'
-                : 'text-white/40 hover:text-white/60 hover:bg-white/5 border border-transparent'
+                ? 'bg-secondary text-foreground border border-border'
+                : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50 border border-transparent'
             }`}
           >
             {tab.icon}
@@ -81,8 +81,8 @@ export default function ScriptOrganizerPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-[#0a0a1a] flex items-center justify-center">
-          <Loader2 className="w-10 h-10 text-amber-400 animate-spin" />
+        <div className="min-h-screen bg-background flex items-center justify-center">
+          <Loader2 className="w-10 h-10 text-ring animate-spin" />
         </div>
       }
     >
