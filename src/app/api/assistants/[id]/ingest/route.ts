@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { generateEmbeddings, splitTextIntoChunks, extractTextFromBuffer, generateDocumentSummary } from '@/lib/embeddings';
+import { splitTextIntoChunks, extractTextFromBuffer } from '@/lib/embeddings';
 import { storage, BUCKET_NAME } from '@/lib/gcs';
 
 const supabase = createClient(
@@ -8,9 +8,8 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 );
 
-export const maxDuration = 300; // 대용량 파일 처리를 위해 5분으로 확장
-
-// POST: 보조작가 전용 자료 업로드 (대본/자료 구분)
+// Step 1: GCS 업로드 + 텍스트 추출 + 청킹 (10초 이내 완료)
+// 임베딩 생성은 클라이언트가 /api/embeddings/batch를 반복 호출하여 처리
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -18,7 +17,6 @@ export async function POST(
   try {
     const { id } = await params;
 
-    // 보조작가 정보 조회
     const { data: assistant, error: fetchErr } = await supabase
       .from('assistants')
       .select('*')
@@ -31,7 +29,7 @@ export async function POST(
 
     const formData = await req.formData();
     const file = formData.get('file') as File;
-    const docType = (formData.get('docType') as string) || 'script'; // 'script' | 'reference'
+    const docType = (formData.get('docType') as string) || 'script';
 
     if (!file) {
       return NextResponse.json({ error: '파일이 제공되지 않았습니다.' }, { status: 400 });
@@ -41,25 +39,18 @@ export async function POST(
     const buffer = Buffer.from(arrayBuffer);
     const fileName = file.name;
 
-    // docType에 따라 하위 폴더 분리
     const subFolder = docType === 'reference' ? 'references' : 'scripts';
     const gcsPath = `${assistant.gcs_folder}/${subFolder}/${fileName}`;
     const gcsUri = `gs://${BUCKET_NAME}/${gcsPath}`;
 
-    console.log(`[Assistant Ingest] GCS 업로드: ${gcsUri} (유형: ${docType})`);
-
-    // 1단계: GCS에 파일 업로드 (원본 보관)
+    // 1. GCS에 파일 업로드
     const bucket = storage.bucket(BUCKET_NAME);
     await bucket.file(gcsPath).save(buffer, {
       metadata: { contentType: file.type || 'application/octet-stream' },
     });
 
-    console.log(`[Assistant Ingest] GCS 업로드 완료`);
-
-    // 2단계: 텍스트 추출
-    console.log(`[Assistant Ingest] 텍스트 추출 시작...`);
+    // 2. 텍스트 추출
     const text = await extractTextFromBuffer(buffer, fileName);
-    console.log(`[Assistant Ingest] 텍스트 추출 완료: ${text.length}자`);
 
     if (!text || text.trim().length === 0) {
       return NextResponse.json({
@@ -70,86 +61,27 @@ export async function POST(
       });
     }
 
-    // 3단계: 텍스트 청킹
-    console.log(`[Assistant Ingest] 텍스트 청킹 시작...`);
+    // 3. 텍스트 청킹
     const chunks = await splitTextIntoChunks(text);
-    console.log(`[Assistant Ingest] 청킹 완료: ${chunks.length}개 청크`);
 
-    // 4단계: 임베딩 생성
-    console.log(`[Assistant Ingest] 임베딩 생성 시작... (${chunks.length}개)`);
-    const embeddings = await generateEmbeddings(chunks);
-    console.log(`[Assistant Ingest] 임베딩 생성 완료`);
-
-    // 5단계: Supabase pgvector에 저장
-    console.log(`[Assistant Ingest] pgvector 저장 시작...`);
-    const rows = chunks.map((chunk, i) => ({
-      content: chunk,
-      metadata: {
-        fileName,
-        chunkIndex: i,
-        totalChunks: chunks.length,
-        assistantName: assistant.name,
-      },
-      embedding: JSON.stringify(embeddings[i]),
-      assistant_id: id, // 레벨2 (보조작가 전용)
-      doc_type: docType,
-      source_file: fileName,
-      gcs_uri: gcsUri,
-    }));
-
-    // 배치 삽입 (500개씩)
-    const batchSize = 500;
-    for (let i = 0; i < rows.length; i += batchSize) {
-      const batch = rows.slice(i, i + batchSize);
-      const { error: insertErr } = await supabase.from('documents').insert(batch);
-      if (insertErr) {
-        console.error(`[Assistant Ingest] pgvector 저장 실패 (배치 ${i}):`, insertErr.message);
-        throw new Error(`벡터 저장 실패: ${insertErr.message}`);
-      }
-    }
-
-    console.log(`[Assistant Ingest] pgvector 저장 완료: ${rows.length}개 벡터`);
-
-    // 6단계: 문서 요약 생성 및 저장
-    console.log(`[Assistant Ingest] 문서 요약 생성 시작...`);
-    const summary = await generateDocumentSummary(text, fileName);
-    console.log(`[Assistant Ingest] 문서 요약 생성 완료: ${summary.length}자`);
-
-    // 기존 요약이 있으면 업데이트, 없으면 삽입
-    const { data: existingSummary } = await supabase
-      .from('document_summaries')
-      .select('id')
-      .eq('source_file', fileName)
-      .eq('assistant_id', id)
-      .maybeSingle();
-
-    if (existingSummary) {
-      await supabase.from('document_summaries')
-        .update({ summary, doc_type: docType, char_count: text.length, chunk_count: chunks.length, updated_at: new Date().toISOString() })
-        .eq('id', existingSummary.id);
-    } else {
-      await supabase.from('document_summaries').insert({
-        source_file: fileName,
-        assistant_id: id,
-        summary,
-        doc_type: docType,
-        gcs_uri: gcsUri,
-        char_count: text.length,
-        chunk_count: chunks.length,
-      });
-    }
-
-    const typeLabel = docType === 'reference' ? '참고자료' : '대본';
     return NextResponse.json({
       success: true,
-      message: `"${fileName}" ${typeLabel}로 업로드 및 벡터 인덱싱 완료. ${chunks.length}개 청크가 보조작가 "${assistant.name}"의 전용 지식으로 저장되었습니다.`,
+      step: 'chunks_ready',
       gcsUri,
       docType,
-      chunksCount: chunks.length,
+      fileName,
+      assistantId: id,
+      assistantName: assistant.name,
+      chunks,
+      totalChunks: chunks.length,
+      charCount: text.length,
     });
 
   } catch (err: any) {
     console.error('[Assistant Ingest Exception]', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    const msg = err.status === 429
+      ? 'AI API 요청 한도 초과 — 잠시 후 다시 시도해주세요.'
+      : err.message || '업로드 처리 중 오류가 발생했습니다.';
+    return NextResponse.json({ error: msg }, { status: err.status === 429 ? 429 : 500 });
   }
 }

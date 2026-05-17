@@ -16,7 +16,7 @@ async function sleep(ms: number) {
  * 단일 텍스트의 임베딩 벡터 생성 (재시도 포함)
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < 5; attempt++) {
     try {
       const result = await embeddingModel.embedContent({
         content: { role: 'user', parts: [{ text }] },
@@ -24,9 +24,9 @@ export async function generateEmbedding(text: string): Promise<number[]> {
       } as any);
       return result.embedding.values;
     } catch (err: any) {
-      if (err.status === 429 && attempt < 2) {
-        const waitTime = (attempt + 1) * 5000; // 5초, 10초 대기
-        console.log(`[Embedding] Rate Limit — ${waitTime / 1000}초 대기 후 재시도...`);
+      if (err.status === 429 && attempt < 4) {
+        const waitTime = Math.min((attempt + 1) * 5000, 30000);
+        console.log(`[Embedding] Rate Limit (시도 ${attempt + 1}/5) — ${waitTime / 1000}초 대기...`);
         await sleep(waitTime);
       } else {
         throw err;
@@ -43,7 +43,7 @@ export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
   const embeddings: number[][] = [];
 
   for (let i = 0; i < texts.length; i++) {
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < 5; attempt++) {
       try {
         const result = await embeddingModel.embedContent({
           content: { role: 'user', parts: [{ text: texts[i] }] },
@@ -52,9 +52,9 @@ export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
         embeddings.push(result.embedding.values);
         break;
       } catch (err: any) {
-        if (err.status === 429 && attempt < 2) {
-          const waitTime = (attempt + 1) * 5000;
-          console.log(`[Embedding] Rate Limit (${i + 1}/${texts.length}) — ${waitTime / 1000}초 대기 후 재시도...`);
+        if (err.status === 429 && attempt < 4) {
+          const waitTime = Math.min((attempt + 1) * 5000, 30000);
+          console.log(`[Embedding] Rate Limit (${i + 1}/${texts.length}, 시도 ${attempt + 1}/5) — ${waitTime / 1000}초 대기...`);
           await sleep(waitTime);
         } else {
           throw err;
@@ -62,12 +62,11 @@ export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
       }
     }
 
-    // 매 3개마다 1초 대기 (Rate Limit 예방)
-    if ((i + 1) % 3 === 0 && i < texts.length - 1) {
-      await sleep(1000);
+    // 매 2개마다 1.5초 대기 (Rate Limit 예방 강화)
+    if ((i + 1) % 2 === 0 && i < texts.length - 1) {
+      await sleep(1500);
     }
 
-    // 진행 상황 로그 (10개마다)
     if ((i + 1) % 10 === 0) {
       console.log(`[Embedding] 진행: ${i + 1}/${texts.length}`);
     }

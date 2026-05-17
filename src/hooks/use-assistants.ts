@@ -4,6 +4,49 @@ import { useState, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import type { Assistant, LearnedDocument, DocType, UploadStep } from '@/types';
 
+const EMBED_BATCH_SIZE = 5;
+
+async function processEmbeddingsInBatches(
+  chunks: string[],
+  meta: { fileName: string; assistantId: string | null; docType: string; gcsUri: string; assistantName: string | null },
+  onProgress: (done: number, total: number) => void
+): Promise<void> {
+  const total = chunks.length;
+  for (let i = 0; i < total; i += EMBED_BATCH_SIZE) {
+    const batch = chunks.slice(i, i + EMBED_BATCH_SIZE);
+    const res = await fetch('/api/embeddings/batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chunks: batch,
+        fileName: meta.fileName,
+        assistantId: meta.assistantId,
+        docType: meta.docType,
+        gcsUri: meta.gcsUri,
+        assistantName: meta.assistantName,
+        totalChunks: total,
+        startIndex: i,
+      }),
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => null);
+      throw new Error(errData?.error || `임베딩 처리 실패 (${res.status})`);
+    }
+    onProgress(Math.min(i + EMBED_BATCH_SIZE, total), total);
+  }
+}
+
+async function generateSummary(
+  meta: { fileName: string; assistantId: string | null; docType: string; gcsUri: string; charCount: number; chunkCount: number },
+  textSample: string
+): Promise<void> {
+  await fetch('/api/documents/summary', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...meta, textSample }),
+  });
+}
+
 export function useAssistants() {
   const assistantFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -11,14 +54,12 @@ export function useAssistants() {
   const [loadingAssistants, setLoadingAssistants] = useState(false);
   const [activeAssistantId, setActiveAssistantId] = useState<string | null>(null);
 
-  // 생성 폼
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newName, setNewName] = useState('');
   const [newSpecialty, setNewSpecialty] = useState('');
   const [newPersona, setNewPersona] = useState('');
   const [creating, setCreating] = useState(false);
 
-  // 어시스턴트 문서
   const [assistantDocs, setAssistantDocs] = useState<LearnedDocument[]>([]);
   const [loadingAssistantDocs, setLoadingAssistantDocs] = useState(false);
   const [assistantFiles, setAssistantFiles] = useState<File[]>([]);
@@ -90,7 +131,6 @@ export function useAssistants() {
       });
       const data = await res.json();
       if (data.success) {
-        // 로컬 상태 갱신
         setAssistants(prev => prev.map(a =>
           a.id === assistantId ? { ...a, response_style: responseStyle } : a
         ));
@@ -123,6 +163,7 @@ export function useAssistants() {
     }
   }, [activeAssistantId, fetchAssistants]);
 
+  // 3단계 파이프라인: (1) GCS+추출+청킹 → (2) 임베딩 배치 → (3) 요약
   const handleAssistantFileUpload = useCallback(async () => {
     if (assistantFiles.length === 0 || !activeAssistantId) return;
     const total = assistantFiles.length;
@@ -130,26 +171,59 @@ export function useAssistants() {
     let successCount = 0;
     let failCount = 0;
     const failedNames: string[] = [];
+    let lastError = '';
 
     for (let i = 0; i < total; i++) {
       const currentFile = assistantFiles[i];
-      setAssistantUploadStep('uploading-gcs');
-      setAssistantUploadMessage(`(${i + 1}/${total}) "${currentFile.name}" ${typeLabel} GCS에 업로드 중...`);
       try {
+        // Step 1: GCS 업로드 + 텍스트 추출 + 청킹
+        setAssistantUploadStep('uploading-gcs');
+        setAssistantUploadMessage(`(${i + 1}/${total}) "${currentFile.name}" 업로드 중...`);
+
         const formData = new FormData();
         formData.append('file', currentFile);
         formData.append('docType', assistantDocType);
-        const res = await fetch(`/api/assistants/${activeAssistantId}/ingest`, { method: 'POST', body: formData });
-        const data = await res.json();
-        if (data.success) {
-          setAssistantUploadStep('importing-ai');
-          setAssistantUploadMessage(`(${i + 1}/${total}) "${currentFile.name}" ${typeLabel} 인덱싱 중...`);
-          successCount++;
-        } else {
-          failCount++;
-          failedNames.push(currentFile.name);
+        const step1Res = await fetch(`/api/assistants/${activeAssistantId}/ingest`, { method: 'POST', body: formData });
+
+        if (!step1Res.ok) {
+          const errData = await step1Res.json().catch(() => null);
+          throw new Error(errData?.error || `서버 오류 (${step1Res.status})`);
         }
-      } catch {
+
+        const step1Data = await step1Res.json();
+        if (!step1Data.success) throw new Error(step1Data.error || '파일 처리 실패');
+
+        // 텍스트 없는 파일 (이미지 PDF 등)
+        if (step1Data.warning) {
+          successCount++;
+          continue;
+        }
+
+        const { chunks, fileName, assistantId, docType, gcsUri, assistantName, totalChunks, charCount } = step1Data;
+
+        // Step 2: 임베딩 배치 처리
+        setAssistantUploadStep('importing-ai');
+        await processEmbeddingsInBatches(
+          chunks,
+          { fileName, assistantId, docType, gcsUri, assistantName },
+          (done, chunkTotal) => {
+            setAssistantUploadMessage(`(${i + 1}/${total}) "${currentFile.name}" 인덱싱 ${done}/${chunkTotal}`);
+          }
+        );
+
+        // Step 3: 요약 생성 (실패해도 전체 실패로 처리하지 않음)
+        setAssistantUploadMessage(`(${i + 1}/${total}) "${currentFile.name}" 요약 생성 중...`);
+        const textSample = chunks.slice(0, 30).join('\n');
+        await generateSummary(
+          { fileName, assistantId, docType, gcsUri, charCount, chunkCount: totalChunks },
+          textSample
+        ).catch((err: any) => console.warn('[Summary] 요약 생성 실패 (무시):', err.message));
+
+        successCount++;
+      } catch (err: any) {
+        const errMsg = err.message || '알 수 없는 오류';
+        console.error(`[Upload] "${currentFile.name}" 실패:`, errMsg);
+        lastError = errMsg;
         failCount++;
         failedNames.push(currentFile.name);
       }
@@ -161,8 +235,9 @@ export function useAssistants() {
       toast.success(`${successCount}개 ${typeLabel} 학습 등록 완료!`);
     } else {
       setAssistantUploadStep(successCount > 0 ? 'complete' : 'error');
-      setAssistantUploadMessage(`${successCount}개 성공, ${failCount}개 실패 (${failedNames.join(', ')})`);
-      toast.error(`${failCount}개 파일 업로드 실패`);
+      const detail = lastError ? ` — ${lastError}` : '';
+      setAssistantUploadMessage(`${successCount}개 성공, ${failCount}개 실패 (${failedNames.join(', ')})${detail}`);
+      toast.error(`${failCount}개 파일 업로드 실패: ${lastError || failedNames.join(', ')}`);
     }
     setAssistantFiles([]);
     if (assistantFileInputRef.current) assistantFileInputRef.current.value = '';
@@ -170,7 +245,7 @@ export function useAssistants() {
     setTimeout(() => {
       setAssistantUploadStep('idle');
       setAssistantUploadMessage('');
-    }, 5000);
+    }, 8000);
   }, [assistantFiles, activeAssistantId, assistantDocType, fetchAssistantDocs]);
 
   const handleDeleteAssistantDoc = useCallback(async (doc: LearnedDocument) => {
