@@ -1,5 +1,18 @@
 # Genie Assistant Changelog
 
+## [V1.031] - 2026-08-18
+
+### 🎨 랜딩 페이지 전면 리뉴얼 (Claude 디자인 이식)
+- **Summary**: 랜딩 페이지를 Claude 디자인 "지작 랜딩 흐름"으로 교체 — 업로드 → 전용 보조작가 → 디테일 수정 → 작가님의 결정 4단계 흐름 구성
+- **Detail**:
+  - ✅ `src/app/landing/page.tsx`: 기존 React/Tailwind 랜딩 → Claude 디자인 콘텐츠 전면 교체 (서버 컴포넌트 정적 렌더)
+  - ✅ Pretendard 폰트(랜딩 전용 CDN 로드), 크림/테라코타/다크 고정 색상 팔레트 (다크모드 비의존)
+  - ✅ 구성: 히어로 + 4단계 흐름(01~04) + 신뢰 지표 + 팀 소개 + 가격표(BASIC/PRO) + 푸터
+  - ✅ CTA 버튼 전체를 내부 `/register`로 연결 (디자인의 `style-hover` → CSS `:hover` 전환)
+  - ✅ 기존 `public/logo_B.png` 재사용 (헤더·푸터)
+  - ✅ 버전 표기 V1.030 → V1.031 (`src/lib/version.ts`)
+- **Build Time**: 2026-08-18
+
 ## [V1.030] - 2026-05-02
 
 ### 종합 업데이트 (V1.028~V1.030)
