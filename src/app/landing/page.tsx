@@ -37,24 +37,18 @@ const LANDING_HTML = `
         <img src="/logo_B.png" alt="지작" style="height:24px;width:auto;display:block">
         <span style="font-weight:800;font-size:15px;letter-spacing:-0.01em">지작 <span style="font-weight:500;font-size:11px;color:#3F3F3B;letter-spacing:0.06em">JIZAK</span></span>
       </a>
-      <a href="/register" class="dc-cta-primary" style="background:#D97757;color:#fff;font-size:13.5px;font-weight:600;padding:10px 18px;border-radius:999px;white-space:nowrap">내 보조작가 만들어보기</a>
+      <a href="/register" class="dc-cta-primary" style="background:#D97757;color:#fff;font-size:13.5px;font-weight:600;padding:10px 18px;border-radius:999px;white-space:nowrap">나의 보조작가 고용하기</a>
     </div>
   </header>
 
   <section id="hero" style="background:#fff;padding:96px 32px 84px;text-align:center">
     <div style="max-width:760px;margin:0 auto">
-      <h1 style="font-size:clamp(36px,5.2vw,64px);line-height:1.12">내 자료로 만드는<br><span style="display:inline-block;background:#D97757;color:#fff;border-radius:14px;padding:2px 16px 6px;margin:0 2px">보조작가</span></h1>
-      <p style="margin-top:26px;font-size:16.5px;line-height:1.75;color:#3F3F3B;max-width:34em;margin-left:auto;margin-right:auto">대본과 자료를 업로드하면 그 자료를 근거로 확인하는 보조작가가 만들어집니다. 지작은 대신 쓰지 않습니다. 문장은 끝까지 작가님이 씁니다.</p>
+      <h1 style="font-size:clamp(36px,5.2vw,64px);line-height:1.12">처음 만난<br><span style="display:inline-block;background:#D97757;color:#fff;border-radius:14px;padding:2px 16px 6px;margin:0 2px">보조작가</span></h1>
+      <p style="margin-top:26px;font-size:16.5px;line-height:1.75;color:#3F3F3B;max-width:34em;margin-left:auto;margin-right:auto">지작은 집필하지 않습니다.<br>당신의 글과 스타일, 니즈를 이해하고 당신을 돕는 보조작가입니다.</p>
       <div style="margin-top:32px;display:flex;justify-content:center">
-        <a href="/register" class="dc-cta-primary" style="background:#D97757;color:#fff;font-size:15px;font-weight:600;padding:14px 28px;border-radius:999px;white-space:nowrap">내 보조작가 만들어보기</a>
+        <a href="/register" class="dc-cta-primary" style="background:#D97757;color:#fff;font-size:15px;font-weight:600;padding:14px 28px;border-radius:999px;white-space:nowrap">나의 보조작가 고용하기</a>
       </div>
-      <div style="margin-top:64px;font-size:11.5px;font-weight:700;letter-spacing:0.18em;color:#3F3F3B">실제 창작 현장에서 약 1년째 검증되고 있습니다</div>
-      <div style="margin-top:26px;display:flex;flex-wrap:wrap;justify-content:center;gap:14px 34px;color:#3F3F3B;font-size:13px;letter-spacing:-0.01em">
-        <span>알파 V1.030 실사용 검증</span>
-        <span>100여 명 작가 협업</span>
-        <span>업로드 자료 RAG 근거 답변</span>
-        <span>부산국제영화제 뉴크리에이터상</span>
-      </div>
+      <div style="margin-top:64px;font-size:11.5px;font-weight:700;letter-spacing:0.18em;color:#3F3F3B">창작 현장에서 실제 사용하면서 더 좋아지는 중입니다</div>
     </div>
   </section>
 
@@ -281,7 +275,7 @@ const LANDING_HTML = `
         <h2 style="font-size:clamp(27px,3.1vw,40px);line-height:1.24;max-width:22em">보조작가는 근거를 놓고,<br>문장은 작가님이 씁니다</h2>
         <p style="margin-top:20px;max-width:34em;font-size:15.5px;line-height:1.75;color:rgba(255,255,255,0.92)">대신 써주는 AI가 아닙니다. 문장을 새로 생성하지 않고, 업로드한 자료를 근거로 확인만 합니다. 창작의 주도권은 끝까지 작가님에게 있습니다.</p>
         <div style="margin-top:36px;display:flex;flex-wrap:wrap;align-items:center;gap:14px">
-          <a href="/register" class="dc-cta-dark" style="background:#151514;color:#fff;font-size:15px;font-weight:600;padding:15px 28px;border-radius:999px;white-space:nowrap">내 보조작가 만들어보기</a>
+          <a href="/register" class="dc-cta-dark" style="background:#151514;color:#fff;font-size:15px;font-weight:600;padding:15px 28px;border-radius:999px;white-space:nowrap">나의 보조작가 고용하기</a>
           <span style="font-size:13.5px;color:rgba(255,255,255,0.9)">알파 단계 무료 체험 · 구독 후 7일 내 전액 환불(임시 정책)</span>
         </div>
         <div style="margin-top:44px;display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px;max-width:680px">
