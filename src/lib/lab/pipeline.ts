@@ -147,8 +147,21 @@ export async function advanceRun(runId: string): Promise<AdvanceResult> {
       model: 'gemini-2.5-flash',
       generationConfig: { responseMimeType: 'application/json', maxOutputTokens: 65536 },
     });
-    const result = await model.generateContent(prompt);
-    const output = parseJson(result.response.text());
+
+    // 생성 JSON이 깨지는 경우가 있어(인용문 내 따옴표 등) 파싱 실패 시 재생성
+    let output: any = null;
+    let lastParseError: Error | null = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const result = await model.generateContent(prompt);
+      try {
+        output = parseJson(result.response.text());
+        break;
+      } catch (e: any) {
+        lastParseError = e;
+        console.warn(`[lab] 단계 ${next} JSON 파싱 실패 (시도 ${attempt + 1}/3):`, e.message);
+      }
+    }
+    if (!output) throw lastParseError ?? new Error('JSON 파싱 실패');
 
     const ev = validateEvidence(output, manuscript);
     output._evidence_stats = ev;
@@ -172,6 +185,13 @@ export async function advanceRun(runId: string): Promise<AdvanceResult> {
       const st = s === next ? 'done' : stepMap.get(s)?.status;
       return st !== 'done' && st !== 'skipped';
     }).length;
+
+    if (remaining === 0) {
+      await supabase
+        .from('lab_runs')
+        .update({ status: 'done', finished_at: new Date().toISOString() })
+        .eq('id', runId);
+    }
 
     return { done: remaining === 0, step: next, stepStatus: 'done', remaining };
   } catch (err: any) {
