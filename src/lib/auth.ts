@@ -75,11 +75,21 @@ export async function validateSession(token: string) {
     return null;
   }
 
-  const { data: user } = await supabase
+  const { data: user, error: userError } = await supabase
     .from('app_users')
-    .select('id, username, name')
+    .select('id, username, name, is_admin')
     .eq('id', session.user_id)
     .single();
+
+  // is_admin 컬럼 마이그레이션 이전 환경 폴백 (로그인이 깨지지 않도록)
+  if (userError) {
+    const { data: fallback } = await supabase
+      .from('app_users')
+      .select('id, username, name')
+      .eq('id', session.user_id)
+      .single();
+    return fallback ? { ...fallback, is_admin: false } : null;
+  }
 
   return user || null;
 }
