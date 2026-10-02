@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2 } from 'lucide-react';
+import { StepOutputView, EvidenceList } from './step-views';
 
 const STEP_LABEL: Record<string, string> = {
   '0.5': '시놉시스 대조',
@@ -38,22 +39,6 @@ function verdictOf(item: Item): { verdict: string; reason: string | null } | nul
   const v = item.lab_verdicts;
   if (!v) return null;
   return Array.isArray(v) ? (v[0] ?? null) : v;
-}
-
-function EvidenceList({ evidence }: { evidence: any[] }) {
-  if (!evidence?.length) return null;
-  return (
-    <ul className="mt-1 space-y-1">
-      {evidence.map((e, i) => (
-        <li key={i} className="text-xs text-muted-foreground border-l-2 pl-2">
-          <span className="font-medium">{e.loc}</span> “{e.quote}”
-          {e._evidence_valid === false && (
-            <Badge variant="destructive" className="ml-1 text-[10px]">인용 검증 실패</Badge>
-          )}
-        </li>
-      ))}
-    </ul>
-  );
 }
 
 function ItemCard({ item, onVerdict }: { item: Item; onVerdict: (id: string, verdict: string, reason?: string) => Promise<void> }) {
@@ -226,12 +211,18 @@ export default function RunDetailPage() {
                 <pre className="text-xs bg-muted p-3 rounded overflow-auto max-h-[70vh]">
                   {JSON.stringify(st?.output ?? null, null, 2)}
                 </pre>
-              ) : stepItems.length > 0 ? (
-                stepItems.map((it) => <ItemCard key={it.id} item={it} onVerdict={handleVerdict} />)
               ) : st?.output ? (
-                <pre className="text-xs bg-muted p-3 rounded overflow-auto max-h-[70vh]">
-                  {JSON.stringify(st.output, null, 2)}
-                </pre>
+                <>
+                  <StepOutputView step={s} output={st.output} />
+                  {stepItems.length > 0 && (
+                    <div className="space-y-3">
+                      {['4', '5'].includes(s) === false && stepItems.length > 0 && (
+                        <p className="text-sm font-medium text-muted-foreground mt-2">판정 항목</p>
+                      )}
+                      {stepItems.map((it) => <ItemCard key={it.id} item={it} onVerdict={handleVerdict} />)}
+                    </div>
+                  )}
+                </>
               ) : (
                 <p className="text-sm text-muted-foreground">아직 산출물이 없습니다.</p>
               )}
