@@ -57,17 +57,19 @@ export default function NewRunPage() {
   const handleUpload = async () => {
     const file = fileRef.current?.files?.[0];
     if (!file || !newTitle.trim()) {
-      setError('원고 제목과 텍스트 파일(.txt/.md)이 필요합니다.');
+      setError('원고 제목과 파일(.pdf/.txt/.md)이 필요합니다.');
       return;
     }
     setError('');
     setUploading(true);
     try {
-      const content = await file.text();
+      const formData = new FormData();
+      formData.append('title', newTitle);
+      if (newPart) formData.append('part_label', newPart);
+      formData.append('file', file);
       const res = await fetch('/api/lab/manuscripts', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: newTitle, part_label: newPart || null, content }),
+        body: formData,
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -144,13 +146,13 @@ export default function NewRunPage() {
           </select>
 
           <div className="border-t pt-3 space-y-2">
-            <p className="text-sm text-muted-foreground">또는 새 원고 등록 (.txt / .md)</p>
+            <p className="text-sm text-muted-foreground">또는 새 원고 등록 (.pdf / .txt / .md)</p>
             <div className="flex gap-2">
               <Input placeholder="제목" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} disabled={running} />
               <Input placeholder="부 (예: 2부)" className="w-28" value={newPart} onChange={(e) => setNewPart(e.target.value)} disabled={running} />
             </div>
             <div className="flex gap-2 items-center">
-              <input ref={fileRef} type="file" accept=".txt,.md" className="text-sm" disabled={running} />
+              <input ref={fileRef} type="file" accept=".pdf,.txt,.md" className="text-sm" disabled={running} />
               <Button variant="outline" size="sm" onClick={handleUpload} disabled={uploading || running}>
                 {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : '등록'}
               </Button>
