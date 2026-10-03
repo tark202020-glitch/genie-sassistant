@@ -54,6 +54,20 @@ function validateEvidence(payload: any, manuscript: string): { total: number; va
   return { total, valid };
 }
 
+/** 모델이 최상위 배열로 응답하는 경우 단계별 기본 키로 감싼다 (실측: 단계 4가 issues 배열만 반환) */
+function normalizeOutput(step: string, parsed: any): any {
+  if (!Array.isArray(parsed)) return parsed;
+  const rootKey: Record<string, string> = {
+    '0.5': 'divergences',
+    '1': 'scenes',
+    '3': 'strengths',
+    '4': 'issues',
+    '5': 'questions',
+    '6': 'a_grade',
+  };
+  return { [rootKey[step] ?? 'items']: parsed };
+}
+
 function parseJson(text: string): any {
   try {
     return JSON.parse(text);
@@ -163,7 +177,7 @@ export async function advanceRun(runId: string): Promise<AdvanceResult> {
     for (let attempt = 0; attempt < 3; attempt++) {
       const result = await model.generateContent(prompt);
       try {
-        output = parseJson(result.response.text());
+        output = normalizeOutput(next, parseJson(result.response.text()));
         break;
       } catch (e: any) {
         lastParseError = e;
