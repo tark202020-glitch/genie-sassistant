@@ -2,7 +2,7 @@
 // 주의: R1~R24 중 아래에 없는 번호는 프로토콜 v0.1 원문 입수 후 추가한다 (개발 진행문서 §9).
 //       정의가 입력된 규칙만 단계 4 프롬프트에 포함된다.
 
-export const RULES_VERSION = 'rules-2026-10-02.1 (protocol v0.2 부분 입력)';
+export const RULES_VERSION = 'rules-2026-10-04.2 (protocol v0.2 부분 입력 + R35 감정 전환)';
 
 export interface LabRule {
   id: string;
@@ -119,6 +119,12 @@ export const LAB_RULES: LabRule[] = [
     detect: '소설의 핵심 질문에 서술자가 결말 전에 답하는 단정 서술',
     action: '삭제, 질문으로 되돌림',
     example: '155쪽 "전부 약 덕일 것이다"',
+  },
+  {
+    id: 'R35', name: '감정 전환의 묘사 공백', category: 'character',
+    detect: '인물의 감정·태도·관계가 반전되는 전환점(emotion_arcs 기준)에서 그 인물의 생각·감정 묘사가 없거나, 전환의 계기가 구체물(음식·행동·대사)로 제시되지 않음',
+    action: '전환점에 인물의 생각·감정 묘사를 더하는 방향 제안 (대체 문장 금지). 계기가 이미 구체물로 제시된 전환점은 장점으로 보호',
+    example: '1고 전체 피드백: "세 번의 식사 장면 — 음식을 평하는 현채의 생각, 감정이 더 묘사되었으면"',
   },
 ];
 

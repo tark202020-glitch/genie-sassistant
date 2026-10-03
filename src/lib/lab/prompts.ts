@@ -3,7 +3,7 @@
 
 import { LabRule } from './rules';
 
-export const PROMPTS_VERSION = 'prompts-2026-10-02.1';
+export const PROMPTS_VERSION = 'prompts-2026-10-04.2 (전체 총평·감정 흐름)';
 
 /** 모든 단계 공통 제약 (설계문서 §12) */
 const COMMON = `당신은 소설 편집 보조 에이전트 '지작'이다. 반드시 지켜야 할 제약:
@@ -56,6 +56,7 @@ ${manuscript}
 4. devices: 반복 장치(반복되는 사물·대사·행동)의 첫 등장과 재등장 위치
 5. settings: 설정 추출 — 원고에서 숫자·규칙·물건·직업 서술을 모은다. 같은 항목에 값이 둘 이상이면 status "충돌", 값이 없는데 플롯이 의존하면 "공백", 하나로 일관되면 "일관". 각 값마다 위치 기록
 6. knowledge_states: 주요 인물 3~5명에 대해 장면마다 "이 장면 끝에서 X가 아는 것(knows) / 믿는 것(believes) / 모르는 것(does_not_know)"을 원문 근거와 함께 기록. 이전 장면에서 변한 것(전이) 위주로 쓴다
+7. emotion_arcs: 주요 인물별 감정 흐름 — 장면 순서대로 그 인물의 감정 상태를 추적하고, 감정·태도가 전환되는 지점(예: 냉소→호감, 불신→신뢰, 책임감→체념)을 is_turning_point로 표시한다. 전환점에는 반드시 전환을 일으킨 계기(trigger — 음식·행동·대사 같은 구체물)를 원문 근거와 함께 기록한다. 계기가 원문에 없으면 trigger를 "계기 미서술"로 쓴다
 
 [원고]
 ${manuscript}
@@ -66,7 +67,8 @@ ${manuscript}
 "timeline":[{"note":"","evidence":[{"loc":"","quote":""}]}],
 "devices":[{"name":"","first":{"loc":"","quote":""},"recurrences":[{"loc":"","quote":""}]}],
 "settings":[{"setting_id":"S1","title":"","status":"충돌|공백|일관","values":[{"value":"","loc":"","quote":""}],"plot_depends":true}],
-"knowledge_states":[{"character":"","scene_id":"","loc":"","knows":[],"believes":[],"does_not_know":[],"evidence":[{"loc":"","quote":""}]}]}`;
+"knowledge_states":[{"character":"","scene_id":"","loc":"","knows":[],"believes":[],"does_not_know":[],"evidence":[{"loc":"","quote":""}]}],
+"emotion_arcs":[{"character":"","points":[{"scene_id":"","loc":"","emotion":"","is_turning_point":false,"trigger":"","evidence":[{"loc":"","quote":""}]}]}]}`;
 
     case '2': // 문체 프로파일
       return `${COMMON}
@@ -89,13 +91,16 @@ ${manuscript}
 
 [작업: 단계 3 — 장점 추출]
 원고 자기 기준(단계 2의 약속)으로 장점을 추출한다. 장점이 결함보다 먼저다.
-1. 후보 수집: 장면을 닫는 마지막 대사·행동 / 시간 표시가 붙은 공정 서술 / 서술자가 세계를 향해 말하는 문장 / 반복 장치의 첫 등장과 재등장
-2. 세 테스트: 삭제(뒤의 해설·감정 서술을 지워도 장면이 서는가) / 약속 이행(단계 2의 약속을 이행하는가 — 기제를 한 문장으로 쓰지 못하면 탈락) / 개성(원고 안의 다른 후보와 같은 기제를 반복하는가. 반복되는 습관 = 개성, 한 번뿐인 튀는 문장 = 우연)
-3. 유형화: 통과한 후보를 기제가 같은 것끼리 묶고 이름을 붙인다. 유형마다 인용 2~4개와 보호 지시("손대지 않는다 / 뒤의 해설만 지운다 / 이 톤을 다른 장면에도")
+1. 후보 수집: 장면을 닫는 마지막 대사·행동 / 시간 표시가 붙은 공정 서술 / 서술자가 세계를 향해 말하는 문장 / 반복 장치의 첫 등장과 재등장 / **인물의 감정·태도가 전환되는 장면**(냉소→호감, 불신→신뢰 등 — 단계 1의 emotion_arcs 전환점 참조) / **인물 간 관계가 밀착되는 순간**(음식·행동 같은 구체물이 마음을 움직이는 장면)
+2. 세 테스트: 삭제(뒤의 해설·감정 서술을 지워도 장면이 서는가) / 약속 이행(단계 2의 약속을 이행하는가 — 기제를 한 문장으로 쓰지 못하면 탈락. 감정 전환 장면은 전환의 계기가 구체물로 제시되어야 통과) / 개성(원고 안의 다른 후보와 같은 기제를 반복하는가. 반복되는 습관 = 개성, 한 번뿐인 튀는 문장 = 우연)
+3. 유형화: 통과한 후보를 기제가 같은 것끼리 묶고 이름을 붙인다(한 줄 대사 / 실시간 공정 / 서술자 위트 / **감정 전환의 구체물** …). 유형마다 인용 2~4개와 보호 지시("손대지 않는다 / 뒤의 해설만 지운다 / 이 톤을 다른 장면에도")
 4. planted: 뒤에서 격발될 수 있게 심어둔 것을 planted로 기록
 
 [문체 프로파일(단계 2)]
 ${JSON.stringify(prior['2'] ?? {}, null, 0).slice(0, 10000)}
+
+[인물별 감정 흐름(단계 1 emotion_arcs)]
+${JSON.stringify((prior['1'] as any)?.emotion_arcs ?? [], null, 0).slice(0, 15000)}
 
 [원고]
 ${manuscript}
@@ -108,8 +113,9 @@ ${manuscript}
       return `${COMMON}
 
 [작업: 단계 4 — 결함 탐지]
-아래 규칙 라이브러리로 결함을 탐지한다. 실행 순서: R26 → R25 → R17·R18 → R8 → R30 → 나머지.
+아래 규칙 라이브러리로 결함을 탐지한다. 실행 순서: R26 → R25 → R35 → R17·R18 → R8 → R30 → 나머지.
 - R25는 반드시 단계 1의 knowledge_states 전이 검사로 수행한다.
+- R35는 반드시 단계 1의 emotion_arcs 전환점 검사로 수행한다 (전환인데 감정 묘사·구체적 계기가 없는 곳).
 - 등급: A(구조를 흔드는 것, 1~3건만) / B(장면 단위) / C(문장 단위).
 - 결함은 반드시 연결된 장점(linked_strengths)을 확인하고, 장점을 훼손하는 수정 방향은 내지 않는다.
 - 대체 문장 금지. direction은 "무엇을 어느 방향으로"까지만.
@@ -117,8 +123,8 @@ ${manuscript}
 [규칙 라이브러리]
 ${rulesBlock(rules ?? [])}
 
-[단계 1 산출물 (settings·knowledge_states 포함)]
-${JSON.stringify(prior['1'] ?? {}, null, 0).slice(0, 30000)}
+[단계 1 산출물 (settings·knowledge_states·emotion_arcs 포함)]
+${JSON.stringify(prior['1'] ?? {}, null, 0).slice(0, 60000)}
 
 [문체 프로파일]
 ${JSON.stringify(prior['2'] ?? {}, null, 0).slice(0, 8000)}
@@ -150,21 +156,35 @@ ${manuscript}
 [출력 JSON]
 {"questions":[{"q_id":"Q-01","type":"info|setting|ask_author|propose|design","resolved_in_manuscript":false,"resolution_loc":null,"question":"작가에게 보낼 질문 문장","context":"왜 묻는가","evidence":[{"loc":"","quote":""}]}]}`;
 
-    case '6': // 업그레이드 방향
+    case '6': // 업그레이드 방향 — 작품 단위 총평 + 인물 중심 구성
       return `${COMMON}
 
 [작업: 단계 6 — 업그레이드 방향]
-전체 산출물을 종합해 작가에게 갈 최종 구성을 만든다:
-1. a_grade: A급 1~3건 — 문제·근거·방향. (있으면) 후보안은 방향 제시이지 대체 문장이 아니다
-2. setting_diff: 설정집 초안 — 원고에서 뽑은 값·충돌·공백 정리
-3. author_questions: 확인(confirm) / 고를 것(choose) / 참고(reference)로 분류한 작가 질문 목록. 설정 공백·충돌은 값을 정해주지 말고 질문으로. 후보 수치는 참고로만
-4. summary: 장점 먼저, 크게 하나의 메시지
+전체 산출물을 종합해 작가에게 갈 최종 구성을 만든다. 구성 원칙: 전문 편집자의 작품 피드백처럼 ①확실히 좋아서 더 살리고 싶은 것(인물 중심) ②비어있는 설정 ③풀리지 않는 전체 질문 순서로, 장점이 결함보다 먼저다.
+
+1. overall: 작품 단위 총평 —
+   - logline: 이 소설을 한 문장으로 (누가, 무엇을 하다가, 어떻게 되는 이야기)
+   - protagonist_arc: 주인공의 궤적 평가 (예: 추락→재기→승부수). 궤적이 모든 주요 장면에서 작동하는지, 끊기는 구간이 있으면 어디인지
+   - structure: 이야기의 구조가 말하려는 바(주제·장르 기제)를 지지하는가. 방향이 흔들리기 시작하는 지점이 있으면 쪽과 이유를 명시
+   - readability_pattern: 잘 읽히는 장면들의 공통점과 느려지는 장면들의 공통점 (각각 예시 쪽)
+2. character_reviews: 주요 인물별 리뷰 (2~4명) —
+   - label: 인물을 한 줄로 정의하는 별칭 (예: "요리가 전부인 사람 OOO")
+   - core_mechanism: 이 인물을 움직이는 핵심 기제 한 문장
+   - shining: 이 인물이 가장 빛나는 장면 1~3곳과 왜 빛나는지
+   - wobbles: 캐릭터 일관성이 흔들리는 지점 — 문제와 방향(대체 문장 금지)
+   - emotion_note: 감정 흐름(emotion_arcs)에서 살릴 것 — 전환점의 계기가 구체물로 제시된 곳은 보호, 전환인데 감정 묘사가 빈 곳은 지적
+3. a_grade: A급 1~3건 — 문제·근거·방향. (있으면) 후보안은 방향 제시이지 대체 문장이 아니다
+4. setting_diff: 설정집 초안 — 원고에서 뽑은 값·충돌·공백 정리
+5. author_questions: 확인(confirm) / 고를 것(choose) / 참고(reference)로 분류한 작가 질문 목록. 설정 공백·충돌은 값을 정해주지 말고 질문으로. 후보 수치는 현실 근거와 함께 참고로만
+6. summary: 장점 먼저, 크게 하나의 메시지 (overall을 2~3문장으로 압축)
 
 [전체 산출물]
-${JSON.stringify(prior, null, 0).slice(0, 60000)}
+${JSON.stringify(prior, null, 0).slice(0, 90000)}
 
 [출력 JSON]
-{"summary":"장점을 먼저 말하는 총평 2~3문장",
+{"overall":{"logline":"","protagonist_arc":"","structure":"","readability_pattern":""},
+"character_reviews":[{"character":"","label":"","core_mechanism":"","shining":[{"loc":"","why":""}],"wobbles":[{"loc":"","problem":"","direction":""}],"emotion_note":""}],
+"summary":"장점을 먼저 말하는 총평 2~3문장",
 "a_grade":[{"title":"","from_issue":"issue_id","problem":"","evidence":[{"loc":"","quote":""}],"direction":"","alternatives":[]}],
 "setting_diff":[{"setting_id":"","title":"","status":"충돌|공백|일관","values":[{"value":"","loc":""}],"question":"충돌·공백이면 작가 질문"}],
 "author_questions":[{"kind":"confirm|choose|reference","question":"","options":[]}]}`;

@@ -150,6 +150,33 @@ function Step1({ out }: { out: any }) {
         </Section>
       )}
 
+      {out.emotion_arcs?.length > 0 && (
+        <Section title="인물별 감정 흐름">
+          <div className="space-y-4">
+            {out.emotion_arcs.map((arc: any, i: number) => (
+              <div key={i}>
+                <p className="font-medium text-sm mb-1">{arc.character}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {(arc.points ?? []).map((p: any, j: number) => (
+                    <span
+                      key={j}
+                      className={`text-xs rounded px-1.5 py-0.5 border ${
+                        p.is_turning_point ? 'border-primary font-medium' : 'text-muted-foreground'
+                      }`}
+                      title={p.trigger || ''}
+                    >
+                      {p.loc} {p.emotion}
+                      {p.is_turning_point && p.trigger ? ` ← ${p.trigger}` : ''}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">테두리 강조 = 전환점 (← 뒤는 전환의 계기)</p>
+        </Section>
+      )}
+
       {out.devices?.length > 0 && (
         <Section title="반복 장치">
           <div className="space-y-2 text-sm">
@@ -253,6 +280,47 @@ function Step6Extra({ out }: { out: any }) {
       {out.summary && (
         <Section title="총평">
           <p className="text-sm whitespace-pre-wrap">{out.summary}</p>
+        </Section>
+      )}
+      {out.overall && (
+        <Section title="작품 단위 평가">
+          <table className="w-full text-sm">
+            <tbody>
+              {out.overall.logline && <tr><Td>한 문장으로</Td><Td><b>{out.overall.logline}</b></Td></tr>}
+              {out.overall.protagonist_arc && <tr><Td>주인공의 궤적</Td><Td>{out.overall.protagonist_arc}</Td></tr>}
+              {out.overall.structure && <tr><Td>구조와 주제</Td><Td>{out.overall.structure}</Td></tr>}
+              {out.overall.readability_pattern && <tr><Td>읽히는 장면의 공통점</Td><Td>{out.overall.readability_pattern}</Td></tr>}
+            </tbody>
+          </table>
+        </Section>
+      )}
+      {out.character_reviews?.length > 0 && (
+        <Section title="확실히 좋아서 더 살리고 싶은 것 — 인물별">
+          <div className="space-y-3">
+            {out.character_reviews.map((c: any, i: number) => (
+              <div key={i} className="text-sm border rounded p-3 space-y-1.5">
+                <p className="font-medium">{c.label || c.character}</p>
+                {c.core_mechanism && <p className="text-muted-foreground">핵심 기제: {c.core_mechanism}</p>}
+                {c.shining?.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium">빛나는 순간</p>
+                    {c.shining.map((s: any, j: number) => (
+                      <p key={j} className="text-xs text-muted-foreground">· {s.loc} — {s.why}</p>
+                    ))}
+                  </div>
+                )}
+                {c.wobbles?.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium">일관성이 흔들리는 지점</p>
+                    {c.wobbles.map((w: any, j: number) => (
+                      <p key={j} className="text-xs text-muted-foreground">· {w.loc} — {w.problem} → {w.direction}</p>
+                    ))}
+                  </div>
+                )}
+                {c.emotion_note && <p className="text-xs">감정 흐름: {c.emotion_note}</p>}
+              </div>
+            ))}
+          </div>
         </Section>
       )}
       {out.a_grade?.length > 0 && (
