@@ -30,6 +30,7 @@ export default function NewRunPage() {
   const [manuscripts, setManuscripts] = useState<Manuscript[]>([]);
   const [manuscriptId, setManuscriptId] = useState('');
   const [mode, setMode] = useState<'I' | 'D' | 'R' | 'F'>('D');
+  const [model, setModel] = useState<'gemini-2.5-flash' | 'gemini-2.5-pro'>('gemini-2.5-flash');
   const [synopsis, setSynopsis] = useState('');
   const [error, setError] = useState('');
 
@@ -95,7 +96,7 @@ export default function NewRunPage() {
       const res = await fetch('/api/lab/runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ manuscript_id: manuscriptId, mode, synopsis: synopsis || null }),
+        body: JSON.stringify({ manuscript_id: manuscriptId, mode, model, synopsis: synopsis || null }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -176,6 +177,20 @@ export default function NewRunPage() {
                 disabled={running}
               >
                 {m} — {{ I: '아이디어', D: '초고', R: '수정고', F: '완고' }[m]}
+              </Button>
+            ))}
+          </div>
+          <div className="flex gap-2 items-center">
+            <span className="text-sm text-muted-foreground w-10">모델</span>
+            {(['gemini-2.5-flash', 'gemini-2.5-pro'] as const).map((m) => (
+              <Button
+                key={m}
+                variant={model === m ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setModel(m)}
+                disabled={running}
+              >
+                {m === 'gemini-2.5-flash' ? 'Flash — 빠름·저비용' : 'Pro — 깊은 분석·느림'}
               </Button>
             ))}
           </div>

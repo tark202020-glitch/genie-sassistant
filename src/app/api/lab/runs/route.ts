@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireAdmin } from '@/lib/lab/guard';
-import { stepsForMode, LabMode } from '@/lib/lab/pipeline';
+import { stepsForMode, LabMode, LAB_MODELS, DEFAULT_LAB_MODEL } from '@/lib/lab/pipeline';
 import { RULES_VERSION } from '@/lib/lab/rules';
 import { PROMPTS_VERSION } from '@/lib/lab/prompts';
 
@@ -28,9 +28,12 @@ export async function POST(req: NextRequest) {
   const auth = await requireAdmin();
   if ('error' in auth) return auth.error;
 
-  const { manuscript_id, mode, synopsis } = await req.json();
+  const { manuscript_id, mode, synopsis, model } = await req.json();
   if (!manuscript_id || !['I', 'D', 'R', 'F'].includes(mode)) {
     return NextResponse.json({ error: '원고와 모드(I/D/R/F)가 필요합니다.' }, { status: 400 });
+  }
+  if (model && !LAB_MODELS.includes(model)) {
+    return NextResponse.json({ error: `지원하지 않는 모델입니다. (${LAB_MODELS.join(', ')})` }, { status: 400 });
   }
 
   const versions = {
@@ -38,6 +41,7 @@ export async function POST(req: NextRequest) {
     rules: RULES_VERSION,
     prompts: PROMPTS_VERSION,
     gold: 'gold-현재시점',
+    model: model || DEFAULT_LAB_MODEL,
   };
 
   const { data: run, error } = await supabase

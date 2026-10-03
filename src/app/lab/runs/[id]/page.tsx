@@ -182,7 +182,7 @@ export default function RunDetailPage() {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        버전 — 프로토콜: {run.versions?.protocol} / 규칙: {run.versions?.rules} / 프롬프트: {run.versions?.prompts}
+        버전 — 모델: {run.versions?.model ?? 'gemini-2.5-flash'} / 프로토콜: {run.versions?.protocol} / 규칙: {run.versions?.rules} / 프롬프트: {run.versions?.prompts}
       </p>
 
       <Tabs defaultValue={stepOrder[0]}>

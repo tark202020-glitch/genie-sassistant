@@ -64,6 +64,7 @@ export default function LabHome() {
                   <th>원고</th>
                   <th>모드</th>
                   <th>상태</th>
+                  <th>모델</th>
                   <th>프롬프트 버전</th>
                   <th></th>
                 </tr>
@@ -81,6 +82,9 @@ export default function LabHome() {
                       <Badge variant={r.status === 'done' ? 'default' : r.status === 'failed' ? 'destructive' : 'secondary'}>
                         {STATUS_LABEL[r.status] ?? r.status}
                       </Badge>
+                    </td>
+                    <td className="text-xs text-muted-foreground">
+                      {(r.versions?.model ?? 'gemini-2.5-flash').replace('gemini-2.5-', '')}
                     </td>
                     <td className="text-xs text-muted-foreground">{r.versions?.prompts}</td>
                     <td className="text-right">

@@ -12,6 +12,10 @@ const supabase = createClient(
 
 export type LabMode = 'I' | 'D' | 'R' | 'F';
 
+export const LAB_MODELS = ['gemini-2.5-flash', 'gemini-2.5-pro'] as const;
+export type LabModel = (typeof LAB_MODELS)[number];
+export const DEFAULT_LAB_MODEL: LabModel = 'gemini-2.5-flash';
+
 /** 모드별 실행 단계 (설계문서 v0.2 §6-2). R의 diff·증분은 2차 — 1차는 D와 동일 집합으로 실행 */
 export function stepsForMode(mode: LabMode, hasSynopsis: boolean): string[] {
   const base: Record<LabMode, string[]> = {
@@ -92,10 +96,15 @@ export interface AdvanceResult {
 export async function advanceRun(runId: string): Promise<AdvanceResult> {
   const { data: run, error: runErr } = await supabase
     .from('lab_runs')
-    .select('id, mode, synopsis, status, manuscript_id, lab_manuscripts(content)')
+    .select('id, mode, synopsis, status, versions, manuscript_id, lab_manuscripts(content)')
     .eq('id', runId)
     .single();
   if (runErr || !run) return { done: true, error: '실행을 찾을 수 없습니다.' };
+
+  const modelName: string =
+    (run.versions as any)?.model && LAB_MODELS.includes((run.versions as any).model)
+      ? (run.versions as any).model
+      : DEFAULT_LAB_MODEL;
 
   const manuscript: string = (run as any).lab_manuscripts?.content ?? '';
   const order = stepsForMode(run.mode as LabMode, !!run.synopsis);
@@ -144,7 +153,7 @@ export async function advanceRun(runId: string): Promise<AdvanceResult> {
     });
 
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
+      model: modelName,
       generationConfig: { responseMimeType: 'application/json', maxOutputTokens: 65536 },
     });
 
