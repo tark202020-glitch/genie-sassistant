@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { estimateCost } from '@/lib/lab/pricing';
 
 interface RunRow {
   id: string;
@@ -65,7 +66,7 @@ export default function LabHome() {
                   <th>모드</th>
                   <th>상태</th>
                   <th>모델</th>
-                  <th>토큰</th>
+                  <th>토큰 (대략 비용)</th>
                   <th>프롬프트 버전</th>
                   <th></th>
                 </tr>
@@ -91,11 +92,25 @@ export default function LabHome() {
                       className="text-xs text-muted-foreground whitespace-nowrap"
                       title={
                         r.metrics?.tokens
-                          ? `입력 ${r.metrics.tokens.prompt.toLocaleString('ko-KR')} / 출력 ${r.metrics.tokens.output.toLocaleString('ko-KR')}`
+                          ? estimateCost(r.versions?.model, r.metrics.tokens)?.formula
                           : '기록 없음 (토큰 집계 도입 전 실행)'
                       }
                     >
-                      {r.metrics?.tokens ? r.metrics.tokens.total.toLocaleString('ko-KR') : '—'}
+                      {r.metrics?.tokens ? (
+                        <>
+                          {r.metrics.tokens.total.toLocaleString('ko-KR')}
+                          {(() => {
+                            const c = estimateCost(r.versions?.model, r.metrics.tokens);
+                            return c ? (
+                              <span className="block">
+                                ≈ ${c.usd.toFixed(2)} (약 {c.krw.toLocaleString('ko-KR')}원)
+                              </span>
+                            ) : null;
+                          })()}
+                        </>
+                      ) : (
+                        '—'
+                      )}
                     </td>
                     <td className="text-xs text-muted-foreground">{r.versions?.prompts}</td>
                     <td className="text-right">

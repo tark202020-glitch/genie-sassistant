@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2 } from 'lucide-react';
 import { StepOutputView, EvidenceList } from './step-views';
+import { estimateCost } from '@/lib/lab/pricing';
 
 const STEP_LABEL: Record<string, string> = {
   '0.5': '시놉시스 대조',
@@ -207,7 +208,10 @@ export default function RunDetailPage() {
       <p className="text-xs text-muted-foreground">
         버전 — 모델: {run.versions?.model ?? 'gemini-2.5-flash'} / 프로토콜: {run.versions?.protocol} / 규칙: {run.versions?.rules} / 프롬프트: {run.versions?.prompts}
         {run.metrics?.tokens && (
-          <> / 토큰: 총 {run.metrics.tokens.total.toLocaleString('ko-KR')} (입력 {run.metrics.tokens.prompt.toLocaleString('ko-KR')} · 출력 {run.metrics.tokens.output.toLocaleString('ko-KR')})</>
+          <>
+            {' '}/ 비용(대략): {estimateCost(run.versions?.model, run.metrics.tokens)?.formula}
+            {' '}(약 {estimateCost(run.versions?.model, run.metrics.tokens)?.krw.toLocaleString('ko-KR')}원)
+          </>
         )}
       </p>
 
