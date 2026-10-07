@@ -3,7 +3,7 @@
 
 import { LabRule } from './rules';
 
-export const PROMPTS_VERSION = 'prompts-2026-10-07.7 (장점 구조 단위 후보 5축 추가)';
+export const PROMPTS_VERSION = 'prompts-2026-10-07.8 (핵심 규칙 검사 보고 강제)';
 
 /** 모든 단계 공통 제약 (설계문서 §12) */
 const COMMON = `당신은 소설 편집 보조 에이전트 '지작'이다. 반드시 지켜야 할 제약:
@@ -127,6 +127,7 @@ ${manuscript}
 - R36은 현재형 서술이 쓰인 구간을 "공정 장면(실시간 진행)"과 "그 외"로 나눠, 그 외 구간의 현재형 사용과 전환 규칙 부재를 검사한다.
 - R37은 정보 없는 발화·행동 지시문('말한다', '고개를 든다' 류)의 반복을 세고, 집중 구간을 짚는다.
 - R38은 원고 전체에서 반복 제기되는 핵심 질문(예: "왜 그랬나")을 찾아, 답이 변주·심화 없이 동일하게 반복되는지 검사한다.
+- **생략 금지 규칙**: R16(실존 기업·인물·브랜드명 전수 검사), R25(지식 상태 전이), R38(답 반복)은 다른 결함이 많아도 반드시 검사하고, 결함이 없으면 mandatory_checks에 "해당 없음"과 그 근거를 한 줄로 기록한다. 이 세 규칙의 검사 결과가 빠진 출력은 불완전한 출력이다.
 - 등급: A(구조를 흔드는 것, 1~3건만) / B(장면 단위) / C(문장 단위).
 - 결함은 반드시 연결된 장점(linked_strengths)을 확인하고, 장점을 훼손하는 수정 방향은 내지 않는다.
 - 대체 문장 금지. direction은 "무엇을 어느 방향으로"까지만.
@@ -147,7 +148,8 @@ ${JSON.stringify(prior['3'] ?? {}, null, 0).slice(0, 10000)}
 ${manuscript}
 
 [출력 JSON]
-{"issues":[{"issue_id":"I-01","rule_id":"R25","category":"","grade":"A|B|C","scope":"scene|part|cross_part|design","loc":"쪽","evidence":[{"loc":"","quote":""}],"knowledge_conflict":null,"diagnosis":"무엇이 문제인가","direction":"방향","linked_strengths":[]}]}`;
+{"issues":[{"issue_id":"I-01","rule_id":"R25","category":"","grade":"A|B|C","scope":"scene|part|cross_part|design","loc":"쪽","evidence":[{"loc":"","quote":""}],"knowledge_conflict":null,"diagnosis":"무엇이 문제인가","direction":"방향","linked_strengths":[]}],
+"mandatory_checks":[{"rule_id":"R16","result":"결함 보고(issue_id) 또는 해당 없음","basis":"한 줄 근거"},{"rule_id":"R25","result":"","basis":""},{"rule_id":"R38","result":"","basis":""}]}`;
 
     case '5': // 물음표 분류
       return `${COMMON}
