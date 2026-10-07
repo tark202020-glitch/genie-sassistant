@@ -3,7 +3,7 @@
 
 import { LabRule } from './rules';
 
-export const PROMPTS_VERSION = 'prompts-2026-10-05.4 (R36 시제·R37 지시문·R38 답 반복)';
+export const PROMPTS_VERSION = 'prompts-2026-10-07.5 (감정 흐름: 대상·관계·정도 추가)';
 
 /** 모든 단계 공통 제약 (설계문서 §12) */
 const COMMON = `당신은 소설 편집 보조 에이전트 '지작'이다. 반드시 지켜야 할 제약:
@@ -56,7 +56,7 @@ ${manuscript}
 4. devices: 반복 장치(반복되는 사물·대사·행동)의 첫 등장과 재등장 위치
 5. settings: 설정 추출 — 원고에서 숫자·규칙·물건·직업 서술을 모은다. 같은 항목에 값이 둘 이상이면 status "충돌", 값이 없는데 플롯이 의존하면 "공백", 하나로 일관되면 "일관". 각 값마다 위치 기록
 6. knowledge_states: 주요 인물 3~5명에 대해 장면마다 "이 장면 끝에서 X가 아는 것(knows) / 믿는 것(believes) / 모르는 것(does_not_know)"을 원문 근거와 함께 기록. 이전 장면에서 변한 것(전이) 위주로 쓴다
-7. emotion_arcs: 주요 인물별 감정 흐름 — 장면 순서대로 그 인물의 감정 상태를 추적하고, 감정·태도가 전환되는 지점(예: 냉소→호감, 불신→신뢰, 책임감→체념)을 is_turning_point로 표시한다. 전환점에는 반드시 전환을 일으킨 계기(trigger — 음식·행동·대사 같은 구체물)를 원문 근거와 함께 기록한다. 계기가 원문에 없으면 trigger를 "계기 미서술"로 쓴다
+7. emotion_arcs: 주요 인물별 감정 흐름 — 장면 순서대로 그 인물의 감정 상태를 추적한다. 각 지점마다 세 가지를 함께 기록한다: ① target — 그 감정이 누구(무엇)를 향하는가. 인물 간 관계의 흐름이 여기서 드러난다 ② intensity — 감정의 정도(약/중/강). 쌓이는지 식는지가 보여야 한다 ③ 전환점(is_turning_point — 예: 냉소→호감, 불신→신뢰)에는 반드시 전환을 일으킨 계기(trigger — 음식·행동·대사 같은 구체물)를 원문 근거와 함께. 계기가 원문에 없으면 trigger를 "계기 미서술"로 쓴다
 
 [원고]
 ${manuscript}
@@ -68,7 +68,7 @@ ${manuscript}
 "devices":[{"name":"","first":{"loc":"","quote":""},"recurrences":[{"loc":"","quote":""}]}],
 "settings":[{"setting_id":"S1","title":"","status":"충돌|공백|일관","values":[{"value":"","loc":"","quote":""}],"plot_depends":true}],
 "knowledge_states":[{"character":"","scene_id":"","loc":"","knows":[],"believes":[],"does_not_know":[],"evidence":[{"loc":"","quote":""}]}],
-"emotion_arcs":[{"character":"","points":[{"scene_id":"","loc":"","emotion":"","is_turning_point":false,"trigger":"","evidence":[{"loc":"","quote":""}]}]}]}`;
+"emotion_arcs":[{"character":"","points":[{"scene_id":"","loc":"","emotion":"","target":"감정이 향하는 인물·대상","intensity":"약|중|강","is_turning_point":false,"trigger":"","evidence":[{"loc":"","quote":""}]}]}]}`;
 
     case '2': // 문체 프로파일
       return `${COMMON}
