@@ -104,6 +104,8 @@ export interface AdvanceResult {
   stepStatus?: string;
   remaining?: number;
   error?: string;
+  /** 직전 시도가 완료되지 못한 단계(서버 시간 한도 초과 등)를 다시 집었음 */
+  resumed?: boolean;
 }
 
 /** 다음 pending 단계 하나를 실행한다. 멱등: running인 단계가 있으면 그 단계를 재실행 */
@@ -142,10 +144,20 @@ export async function advanceRun(runId: string): Promise<AdvanceResult> {
     return { done: true, remaining: 0 };
   }
 
+  // 이미 running인 단계를 다시 집는다 = 직전 호출이 끝을 못 봄 (Vercel 함수 시간 한도 300초 초과 가능성)
+  const interrupted = stepMap.get(next)?.status === 'running';
   await supabase
     .from('lab_run_steps')
     .upsert(
-      { run_id: runId, step: next, status: 'running', updated_at: new Date().toISOString() },
+      {
+        run_id: runId,
+        step: next,
+        status: 'running',
+        error: interrupted
+          ? '⏱ 직전 시도가 완료되지 못했습니다 (서버 처리 시간 한도 300초 초과 가능성). 이 단계를 처음부터 다시 실행합니다.'
+          : null,
+        updated_at: new Date().toISOString(),
+      },
       { onConflict: 'run_id,step' }
     );
   await supabase.from('lab_runs').update({ status: 'running' }).eq('id', runId);
@@ -233,7 +245,7 @@ export async function advanceRun(runId: string): Promise<AdvanceResult> {
       .eq('id', runId);
     run.metrics = { ...prevMetrics, tokens } as any;
 
-    return { done: remaining === 0, step: next, stepStatus: 'done', remaining };
+    return { done: remaining === 0, step: next, stepStatus: 'done', remaining, resumed: interrupted };
   } catch (err: any) {
     const message = err?.message || '단계 실행 실패';
     await supabase

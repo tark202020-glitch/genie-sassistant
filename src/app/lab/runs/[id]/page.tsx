@@ -112,6 +112,7 @@ export default function RunDetailPage() {
   const [data, setData] = useState<{ run: any; steps: any[]; items: Item[] } | null>(null);
   const [showJson, setShowJson] = useState(false);
   const [resuming, setResuming] = useState(false);
+  const [resumeNotice, setResumeNotice] = useState('');
 
   const load = useCallback(
     () =>
@@ -136,12 +137,30 @@ export default function RunDetailPage() {
 
   const handleResume = async () => {
     setResuming(true);
+    setResumeNotice('');
     try {
       let done = false;
       while (!done) {
         const res = await fetch(`/api/lab/runs/${id}/advance`, { method: 'POST' });
-        const adv = await res.json();
-        if (adv.error) break;
+        let adv: any = null;
+        try {
+          adv = await res.json();
+        } catch {
+          adv = null;
+        }
+        if (!res.ok || !adv) {
+          setResumeNotice(
+            '⏱ 서버 처리 시간 한도(300초)를 초과한 것으로 보입니다. [이어서 실행]을 다시 누르면 중단된 단계를 처음부터 재시도합니다.'
+          );
+          break;
+        }
+        if (adv.resumed) {
+          setResumeNotice(`⏱ 단계 ${adv.step}의 직전 시도가 시간 한도로 중단되어 처음부터 다시 실행했습니다.`);
+        }
+        if (adv.error) {
+          setResumeNotice(`단계 ${adv.step ?? '?'} 실패: ${adv.error}`);
+          break;
+        }
         done = adv.done;
         await load();
       }
@@ -181,6 +200,10 @@ export default function RunDetailPage() {
         </div>
       </div>
 
+      {resumeNotice && (
+        <p className="text-sm rounded border border-amber-500/50 bg-amber-500/10 px-3 py-2">{resumeNotice}</p>
+      )}
+
       <p className="text-xs text-muted-foreground">
         버전 — 모델: {run.versions?.model ?? 'gemini-2.5-flash'} / 프로토콜: {run.versions?.protocol} / 규칙: {run.versions?.rules} / 프롬프트: {run.versions?.prompts}
         {run.metrics?.tokens && (
@@ -209,6 +232,9 @@ export default function RunDetailPage() {
             <TabsContent key={s} value={s} className="space-y-3">
               {st?.status === 'failed' && (
                 <p className="text-sm text-destructive">실행 실패: {st.error}</p>
+              )}
+              {st?.status === 'running' && st?.error && (
+                <p className="text-sm rounded border border-amber-500/50 bg-amber-500/10 px-3 py-2">{st.error}</p>
               )}
               {showJson ? (
                 <pre className="text-xs bg-muted p-3 rounded overflow-auto max-h-[70vh]">

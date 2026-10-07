@@ -106,7 +106,20 @@ export default function NewRunPage() {
       let done = false;
       while (!done) {
         const ares = await fetch(`/api/lab/runs/${data.id}/advance`, { method: 'POST' });
-        const adv = await ares.json();
+        let adv: any = null;
+        try {
+          adv = await ares.json();
+        } catch {
+          adv = null;
+        }
+        if (!ares.ok || !adv) {
+          if ([502, 504, 524].includes(ares.status) || !adv) {
+            throw new Error(
+              '⏱ 서버 처리 시간 한도(300초)를 초과한 것으로 보입니다. 실행은 저장되어 있으니 아래 [실행 상세로 이동] 후 [이어서 실행]을 누르면 중단 지점부터 재개됩니다.'
+            );
+          }
+          throw new Error(adv?.error || `실행 실패 (HTTP ${ares.status})`);
+        }
         if (adv.error) throw new Error(`[단계 ${adv.step ?? '?'}] ${adv.error}`);
         if (adv.step) {
           setCurrentStep(adv.step);
@@ -204,7 +217,16 @@ export default function NewRunPage() {
         </CardContent>
       </Card>
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && (
+        <div className="space-y-2">
+          <p className="text-sm text-destructive">{error}</p>
+          {runId && (
+            <Button variant="outline" size="sm" onClick={() => router.push(`/lab/runs/${runId}`)}>
+              실행 상세로 이동
+            </Button>
+          )}
+        </div>
+      )}
 
       {!running ? (
         <Button onClick={handleStart} size="lg">
