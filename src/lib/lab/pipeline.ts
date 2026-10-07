@@ -110,7 +110,7 @@ export interface AdvanceResult {
 export async function advanceRun(runId: string): Promise<AdvanceResult> {
   const { data: run, error: runErr } = await supabase
     .from('lab_runs')
-    .select('id, mode, synopsis, status, versions, manuscript_id, lab_manuscripts(content)')
+    .select('id, mode, synopsis, status, versions, metrics, manuscript_id, lab_manuscripts(content)')
     .eq('id', runId)
     .single();
   if (runErr || !run) return { done: true, error: '실행을 찾을 수 없습니다.' };
@@ -172,10 +172,16 @@ export async function advanceRun(runId: string): Promise<AdvanceResult> {
     });
 
     // 생성 JSON이 깨지는 경우가 있어(인용문 내 따옴표 등) 파싱 실패 시 재생성
+    // 토큰 사용량은 재시도 포함 전부 합산한다 (실제 과금 기준)
     let output: any = null;
     let lastParseError: Error | null = null;
+    const used = { prompt: 0, output: 0, total: 0 };
     for (let attempt = 0; attempt < 3; attempt++) {
       const result = await model.generateContent(prompt);
+      const u: any = result.response.usageMetadata ?? {};
+      used.prompt += u.promptTokenCount ?? 0;
+      used.output += (u.candidatesTokenCount ?? 0) + (u.thoughtsTokenCount ?? 0);
+      used.total += u.totalTokenCount ?? 0;
       try {
         output = normalizeOutput(next, parseJson(result.response.text()));
         break;
@@ -185,6 +191,7 @@ export async function advanceRun(runId: string): Promise<AdvanceResult> {
       }
     }
     if (!output) throw lastParseError ?? new Error('JSON 파싱 실패');
+    output._usage = used;
 
     const ev = validateEvidence(output, manuscript);
     output._evidence_stats = ev;
@@ -209,12 +216,22 @@ export async function advanceRun(runId: string): Promise<AdvanceResult> {
       return st !== 'done' && st !== 'skipped';
     }).length;
 
-    if (remaining === 0) {
-      await supabase
-        .from('lab_runs')
-        .update({ status: 'done', finished_at: new Date().toISOString() })
-        .eq('id', runId);
-    }
+    // 실행 누적 토큰 갱신 (metrics.tokens)
+    const prevMetrics = (run.metrics as any) ?? {};
+    const prev = prevMetrics.tokens ?? { prompt: 0, output: 0, total: 0 };
+    const tokens = {
+      prompt: prev.prompt + used.prompt,
+      output: prev.output + used.output,
+      total: prev.total + used.total,
+    };
+    await supabase
+      .from('lab_runs')
+      .update({
+        metrics: { ...prevMetrics, tokens },
+        ...(remaining === 0 ? { status: 'done', finished_at: new Date().toISOString() } : {}),
+      })
+      .eq('id', runId);
+    run.metrics = { ...prevMetrics, tokens } as any;
 
     return { done: remaining === 0, step: next, stepStatus: 'done', remaining };
   } catch (err: any) {

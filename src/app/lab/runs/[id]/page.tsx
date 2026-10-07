@@ -183,6 +183,9 @@ export default function RunDetailPage() {
 
       <p className="text-xs text-muted-foreground">
         버전 — 모델: {run.versions?.model ?? 'gemini-2.5-flash'} / 프로토콜: {run.versions?.protocol} / 규칙: {run.versions?.rules} / 프롬프트: {run.versions?.prompts}
+        {run.metrics?.tokens && (
+          <> / 토큰: 총 {run.metrics.tokens.total.toLocaleString('ko-KR')} (입력 {run.metrics.tokens.prompt.toLocaleString('ko-KR')} · 출력 {run.metrics.tokens.output.toLocaleString('ko-KR')})</>
+        )}
       </p>
 
       <Tabs defaultValue={stepOrder[0]}>

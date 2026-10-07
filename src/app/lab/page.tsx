@@ -11,7 +11,7 @@ interface RunRow {
   mode: string;
   status: string;
   versions: Record<string, string>;
-  metrics: Record<string, number> | null;
+  metrics: { tokens?: { prompt: number; output: number; total: number } } | null;
   created_at: string;
   lab_manuscripts: { title: string; part_label: string | null } | null;
 }
@@ -65,6 +65,7 @@ export default function LabHome() {
                   <th>모드</th>
                   <th>상태</th>
                   <th>모델</th>
+                  <th>토큰</th>
                   <th>프롬프트 버전</th>
                   <th></th>
                 </tr>
@@ -85,6 +86,16 @@ export default function LabHome() {
                     </td>
                     <td className="text-xs text-muted-foreground">
                       {(r.versions?.model ?? 'gemini-2.5-flash').replace('gemini-2.5-', '')}
+                    </td>
+                    <td
+                      className="text-xs text-muted-foreground whitespace-nowrap"
+                      title={
+                        r.metrics?.tokens
+                          ? `입력 ${r.metrics.tokens.prompt.toLocaleString('ko-KR')} / 출력 ${r.metrics.tokens.output.toLocaleString('ko-KR')}`
+                          : '기록 없음 (토큰 집계 도입 전 실행)'
+                      }
+                    >
+                      {r.metrics?.tokens ? r.metrics.tokens.total.toLocaleString('ko-KR') : '—'}
                     </td>
                     <td className="text-xs text-muted-foreground">{r.versions?.prompts}</td>
                     <td className="text-right">
