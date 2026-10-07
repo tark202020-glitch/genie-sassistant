@@ -3,7 +3,7 @@
 
 import { LabRule } from './rules';
 
-export const PROMPTS_VERSION = 'prompts-2026-10-07.5 (감정 흐름: 대상·관계·정도 추가)';
+export const PROMPTS_VERSION = 'prompts-2026-10-07.6 (감정 축 확장 + 완성 여부 판별·잠정 고지)';
 
 /** 모든 단계 공통 제약 (설계문서 §12) */
 const COMMON = `당신은 소설 편집 보조 에이전트 '지작'이다. 반드시 지켜야 할 제약:
@@ -49,6 +49,7 @@ ${manuscript}
       return `${COMMON}
 
 [작업: 단계 1 — 구조화]
+가장 먼저 completeness를 판별한다: 이 원고가 결말(중심 질문의 해소)까지 있는 완성된 스토리인지, 일부(부 단위)인지. 근거(결말 존재 여부, 미해소 플롯)와 함께 기록한다 — 이후 단계의 복선·구조 판단이 잠정인지 확정인지가 여기에 달린다.
 원고를 다음으로 구조화한다:
 1. scenes: 장면 분할. 장면마다 id(s-01…), 범위(쪽), 등장 인물, 한 줄 요약
 2. characters: 주요 인물과 역할
@@ -62,7 +63,8 @@ ${manuscript}
 ${manuscript}
 
 [출력 JSON]
-{"scenes":[{"scene_id":"s-01","loc":"쪽 범위","characters":[],"summary":""}],
+{"completeness":{"is_complete":false,"scope":"예: 1부까지","basis":"결말 존재 여부·미해소 플롯 근거"},
+"scenes":[{"scene_id":"s-01","loc":"쪽 범위","characters":[],"summary":""}],
 "characters":[{"name":"","role":""}],
 "timeline":[{"note":"","evidence":[{"loc":"","quote":""}]}],
 "devices":[{"name":"","first":{"loc":"","quote":""},"recurrences":[{"loc":"","quote":""}]}],
@@ -164,6 +166,7 @@ ${manuscript}
 
 [작업: 단계 6 — 업그레이드 방향]
 전체 산출물을 종합해 작가에게 갈 최종 구성을 만든다. 구성 원칙: 전문 편집자의 작품 피드백처럼 ①확실히 좋아서 더 살리고 싶은 것(인물 중심) ②비어있는 설정 ③풀리지 않는 전체 질문 순서로, 장점이 결함보다 먼저다.
+**완성 여부 고지(필수)**: 단계 1의 completeness가 미완성(is_complete=false)이면 summary의 첫 문장은 반드시 "이 피드백은 〔scope〕 기준의 잠정 피드백"임을 알리는 문장으로 시작하고, overall.structure와 복선(planted) 회수 판단에는 "전체 완성 후 재평가 필요"를 명시하며 결말 평가를 단정하지 않는다.
 
 1. overall: 작품 단위 총평 —
    - logline: 이 소설을 한 문장으로 (누가, 무엇을 하다가, 어떻게 되는 이야기)
