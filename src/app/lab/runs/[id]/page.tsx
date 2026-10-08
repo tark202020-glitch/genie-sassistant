@@ -29,7 +29,7 @@ const TYPE_LABEL: Record<string, string> = {
   line_edit: '첨삭',
 };
 
-/** 카드 왼쪽 색 띠 — 유형·등급별 구분 */
+/** 유형·등급별 강조색 — 왼쪽 띠가 아니라 유형 칩의 틴트로 쓴다 */
 function accentOf(item: Item): string {
   const p = item.payload;
   if (item.item_type === 'strength') return '#34d399';
@@ -87,14 +87,20 @@ function ItemCard({
     setReason('');
   };
 
+  const accent = accentOf(item);
   return (
-    <Card className={v ? 'opacity-80' : ''} style={{ borderLeft: `4px solid ${accentOf(item)}` }}>
+    <Card className={v ? 'opacity-80' : ''}>
       <CardContent className="pt-4 space-y-2">
         <div className="flex items-start justify-between gap-2">
           <div>
             <div className="flex items-center gap-2">
-              <Badge variant="outline">{TYPE_LABEL[item.item_type]}</Badge>
-              {p.grade && <Badge variant={p.grade === 'A' ? 'destructive' : 'secondary'}>{p.grade}급</Badge>}
+              <span
+                className="rounded-full px-2 py-px text-[11px] font-semibold"
+                style={{ backgroundColor: `${accent}1f`, color: accent, border: `1px solid ${accent}45` }}
+              >
+                {TYPE_LABEL[item.item_type]}
+                {item.item_type === 'issue' && p.grade ? ` ${p.grade}급` : ''}
+              </span>
               {p.status && <Badge variant="secondary">{p.status}</Badge>}
               <span className="font-medium text-sm">{title}</span>
             </div>

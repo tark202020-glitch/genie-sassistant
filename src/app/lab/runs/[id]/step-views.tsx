@@ -49,9 +49,9 @@ function Section({ title, sub, children }: { title: string; sub?: string; childr
 }
 
 function statusColor(status?: string) {
-  if (status === '충돌') return { badge: 'bg-red-500/15 text-red-300 border-red-500/40', bar: '#f87171' };
-  if (status === '공백') return { badge: 'bg-amber-500/15 text-amber-300 border-amber-500/40', bar: '#fbbf24' };
-  return { badge: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40', bar: '#34d399' };
+  if (status === '충돌') return { badge: 'bg-red-500/15 text-red-300 border-red-500/40' };
+  if (status === '공백') return { badge: 'bg-amber-500/15 text-amber-300 border-amber-500/40' };
+  return { badge: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40' };
 }
 
 // ── 인물 관계도 — 노드(아이콘) + 감정 흐름(emotion_arcs의 대상)을 선으로 연결 ──
@@ -199,31 +199,34 @@ function Step1({ out }: { out: any }) {
       {out.scenes?.length > 0 && (
         <Section title={`장면 ${out.scenes.length}개`} sub="카드 색 = 첫 등장 인물">
           <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-            {out.scenes.map((s: any, i: number) => (
+            {out.scenes.map((s: any, i: number) => {
+              const col = sceneColor(s);
+              return (
               <div
                 key={i}
-                className="rounded-lg border bg-background/60 p-3"
-                style={{ borderLeft: `4px solid ${sceneColor(s)}` }}
+                className="rounded-lg p-3"
+                style={{ backgroundColor: `${col}0d`, border: `1px solid ${col}30` }}
               >
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span className="font-mono font-semibold text-foreground/80">{s.scene_id}</span>
+                  <span className="font-mono font-semibold" style={{ color: col }}>{s.scene_id}</span>
                   <span>{s.loc}</span>
                 </div>
                 <p className="mt-1.5 text-sm leading-snug">{s.summary}</p>
                 <div className="mt-2 flex flex-wrap gap-1">
                   {(s.characters ?? []).map((n: string, j: number) => {
                     const key = matchCharacter(n, names) ?? n;
-                    const col = colors.get(key) ?? '#64748b';
+                    const ccol = colors.get(key) ?? '#64748b';
                     return (
-                      <span key={j} className="rounded-full border px-1.5 py-px text-[10px]"
-                        style={{ borderColor: col, color: col, backgroundColor: `${col}1a` }}>
+                      <span key={j} className="inline-flex items-center gap-1 rounded-full bg-background/50 px-1.5 py-px text-[10px] text-foreground/80">
+                        <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: ccol }} />
                         {n}
                       </span>
                     );
                   })}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </Section>
       )}
@@ -234,9 +237,9 @@ function Step1({ out }: { out: any }) {
             {out.settings.map((s: any, i: number) => {
               const sc = statusColor(s.status);
               return (
-                <div key={i} className="rounded-lg border bg-background/60 p-3" style={{ borderLeft: `4px solid ${sc.bar}` }}>
+                <div key={i} className="rounded-lg border bg-background/60 p-3">
                   <div className="flex items-center gap-2">
-                    <span className={`rounded border px-1.5 py-px text-[10px] ${sc.badge}`}>{s.status}</span>
+                    <span className={`rounded-full border px-2 py-px text-[10px] font-semibold ${sc.badge}`}>{s.status}</span>
                     <span className="text-sm font-semibold">{s.title}</span>
                     {s.plot_depends && <span className="text-[10px] text-muted-foreground">플롯 의존</span>}
                   </div>
@@ -595,8 +598,11 @@ function Step6Extra({ out }: { out: any }) {
             {out.character_reviews.map((c: any, i: number) => {
               const col = CHAR_COLORS[i % CHAR_COLORS.length];
               return (
-                <div key={i} className="rounded-lg border bg-background/60 p-3 text-sm" style={{ borderTop: `3px solid ${col}` }}>
-                  <p className="font-bold">{c.label || c.character}</p>
+                <div key={i} className="rounded-lg border bg-background/60 p-3 text-sm">
+                  <p className="flex items-center gap-2 font-bold">
+                    <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: col }} />
+                    {c.label || c.character}
+                  </p>
                   {c.core_mechanism && <p className="mt-1 text-xs text-muted-foreground">핵심 기제 — {c.core_mechanism}</p>}
                   {c.shining?.length > 0 && (
                     <div className="mt-2">
