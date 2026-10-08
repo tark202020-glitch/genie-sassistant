@@ -13,6 +13,7 @@ interface Manuscript {
   title: string;
   part_label: string | null;
   char_count: number;
+  author_context: string | null;
 }
 
 const STEP_LABEL: Record<string, string> = {
@@ -37,6 +38,11 @@ export default function NewRunPage() {
   // 새 원고 업로드
   const [newTitle, setNewTitle] = useState('');
   const [newPart, setNewPart] = useState('');
+  const [newCtx, setNewCtx] = useState('');
+
+  // 선택된 원고의 작가 컨텍스트 편집
+  const [ctxDraft, setCtxDraft] = useState('');
+  const [ctxSaving, setCtxSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -67,6 +73,7 @@ export default function NewRunPage() {
       const formData = new FormData();
       formData.append('title', newTitle);
       if (newPart) formData.append('part_label', newPart);
+      if (newCtx.trim()) formData.append('author_context', newCtx);
       formData.append('file', file);
       const res = await fetch('/api/lab/manuscripts', {
         method: 'POST',
@@ -76,6 +83,7 @@ export default function NewRunPage() {
       if (!res.ok) throw new Error(data.error);
       setNewTitle('');
       setNewPart('');
+      setNewCtx('');
       if (fileRef.current) fileRef.current.value = '';
       await loadManuscripts();
       setManuscriptId(data.id);
@@ -147,7 +155,11 @@ export default function NewRunPage() {
           <select
             className="w-full border rounded-md px-3 py-2 text-sm bg-background"
             value={manuscriptId}
-            onChange={(e) => setManuscriptId(e.target.value)}
+            onChange={(e) => {
+              setManuscriptId(e.target.value);
+              const m = manuscripts.find((x) => x.id === e.target.value);
+              setCtxDraft(m?.author_context ?? '');
+            }}
             disabled={running}
           >
             <option value="">— 등록된 원고 선택 —</option>
@@ -155,9 +167,45 @@ export default function NewRunPage() {
               <option key={m.id} value={m.id}>
                 {m.title}
                 {m.part_label ? ` (${m.part_label})` : ''} · {m.char_count.toLocaleString()}자
+                {m.author_context ? ' · 컨텍스트 있음' : ''}
               </option>
             ))}
           </select>
+
+          {manuscriptId && (
+            <div className="space-y-1.5">
+              <p className="text-sm text-muted-foreground">
+                작가 컨텍스트 (선택 — 이력·기존 작품·기획 의도·협업 메모. 개입 강도 판정과 실명 리스크 평가에 반영됩니다)
+              </p>
+              <Textarea
+                value={ctxDraft}
+                onChange={(e) => setCtxDraft(e.target.value)}
+                rows={5}
+                placeholder={'예)\n- 작가: 전직 PD, 파업 투쟁 실화 보유 (작중 활극의 원형)\n- 기존 작품: 자기계발 에세이 2권 — 독자들이 "읽어도 실행 못 한다"는 반응\n- 기획 의도: 자기계발서 패턴을 최소화한 무협 타임루프 소설. 핵심 반전은 배우자의 시간'}
+                disabled={running}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={ctxSaving || running}
+                onClick={async () => {
+                  setCtxSaving(true);
+                  try {
+                    const res = await fetch(`/api/lab/manuscripts/${manuscriptId}`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ author_context: ctxDraft }),
+                    });
+                    if (res.ok) await loadManuscripts();
+                  } finally {
+                    setCtxSaving(false);
+                  }
+                }}
+              >
+                {ctxSaving ? '저장 중…' : '컨텍스트 저장'}
+              </Button>
+            </div>
+          )}
 
           <div className="border-t pt-3 space-y-2">
             <p className="text-sm text-muted-foreground">또는 새 원고 등록 (.pdf / .txt / .md)</p>
@@ -165,6 +213,13 @@ export default function NewRunPage() {
               <Input placeholder="제목" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} disabled={running} />
               <Input placeholder="부 (예: 2부)" className="w-28" value={newPart} onChange={(e) => setNewPart(e.target.value)} disabled={running} />
             </div>
+            <Textarea
+              placeholder="작가 컨텍스트 (선택) — 이력·기존 작품·기획 의도"
+              value={newCtx}
+              onChange={(e) => setNewCtx(e.target.value)}
+              rows={3}
+              disabled={running}
+            />
             <div className="flex gap-2 items-center">
               <input ref={fileRef} type="file" accept=".pdf,.txt,.md" className="text-sm" disabled={running} />
               <Button variant="outline" size="sm" onClick={handleUpload} disabled={uploading || running}>

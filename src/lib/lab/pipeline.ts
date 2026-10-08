@@ -110,11 +110,21 @@ export interface AdvanceResult {
 
 /** 다음 pending 단계 하나를 실행한다. 멱등: running인 단계가 있으면 그 단계를 재실행 */
 export async function advanceRun(runId: string): Promise<AdvanceResult> {
-  const { data: run, error: runErr } = await supabase
+  let { data: run, error: runErr } = await supabase
     .from('lab_runs')
-    .select('id, mode, synopsis, status, versions, metrics, manuscript_id, lab_manuscripts(content)')
+    .select('id, mode, synopsis, status, versions, metrics, manuscript_id, lab_manuscripts(content, author_context)')
     .eq('id', runId)
     .single();
+  // author_context 컬럼 마이그레이션(lab_02) 이전 환경 폴백
+  if (runErr) {
+    const fallback = await supabase
+      .from('lab_runs')
+      .select('id, mode, synopsis, status, versions, metrics, manuscript_id, lab_manuscripts(content)')
+      .eq('id', runId)
+      .single();
+    run = fallback.data as any;
+    runErr = fallback.error;
+  }
   if (runErr || !run) return { done: true, error: '실행을 찾을 수 없습니다.' };
 
   const modelName: string =
@@ -123,6 +133,7 @@ export async function advanceRun(runId: string): Promise<AdvanceResult> {
       : DEFAULT_LAB_MODEL;
 
   const manuscript: string = (run as any).lab_manuscripts?.content ?? '';
+  const authorContext: string | null = (run as any).lab_manuscripts?.author_context ?? null;
   const order = stepsForMode(run.mode as LabMode, !!run.synopsis);
 
   const { data: steps } = await supabase
@@ -174,6 +185,7 @@ export async function advanceRun(runId: string): Promise<AdvanceResult> {
     const prompt = buildStepPrompt(next, {
       manuscript,
       synopsis: run.synopsis,
+      authorContext,
       prior,
       rules: rulesForMode(run.mode as LabMode),
     });

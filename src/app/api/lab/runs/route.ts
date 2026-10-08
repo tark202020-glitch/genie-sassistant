@@ -36,12 +36,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `지원하지 않는 모델입니다. (${LAB_MODELS.join(', ')})` }, { status: 400 });
   }
 
+  const { data: ms } = await supabase
+    .from('lab_manuscripts')
+    .select('author_context')
+    .eq('id', manuscript_id)
+    .single();
+
   const versions = {
     protocol: PROTOCOL_VERSION,
     rules: RULES_VERSION,
     prompts: PROMPTS_VERSION,
     gold: 'gold-현재시점',
     model: model || DEFAULT_LAB_MODEL,
+    author_context: ms?.author_context ? `있음(${ms.author_context.length}자)` : '없음',
   };
 
   const { data: run, error } = await supabase

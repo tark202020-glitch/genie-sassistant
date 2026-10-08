@@ -3,7 +3,7 @@
 
 import { LabRule } from './rules';
 
-export const PROMPTS_VERSION = 'prompts-2026-10-09.10 (재설계 판정 신호 보강 + R39 생략 금지)';
+export const PROMPTS_VERSION = 'prompts-2026-10-09.11 (작가 컨텍스트 입력 반영)';
 
 /** 모든 단계 공통 제약 (설계문서 §12) */
 const COMMON = `당신은 소설 편집 보조 에이전트 '지작'이다. 반드시 지켜야 할 제약:
@@ -16,8 +16,19 @@ const COMMON = `당신은 소설 편집 보조 에이전트 '지작'이다. 반�
 export interface StepPromptInput {
   manuscript: string;
   synopsis?: string | null;
+  /** 작가 컨텍스트 — 이력·기존 작품·기획 의도·협업 메모 (원고 단위, 선택) */
+  authorContext?: string | null;
   prior: Record<string, unknown>; // 이전 단계 output 모음 (키: step)
   rules?: LabRule[];
+}
+
+/** 작가 컨텍스트 블록 — 제공된 경우에만 프롬프트에 삽입 */
+function authorContextBlock(ctx?: string | null): string {
+  if (!ctx?.trim()) return '';
+  return `
+[작가 컨텍스트 — 작가·기획 정보 (참고용)]
+${ctx.trim().slice(0, 8000)}
+(활용 규칙: 이것은 판단의 참고 정보이지 원고의 일부가 아니다. 인용 근거는 여전히 원고 문장만 쓴다. 작가의 실화·기존 작품에 기반한 표현은 실명 리스크 평가 시 '작가 의도된 실화 활용'인지 구분하고, 기획 의도와 원고의 실제 작동이 어긋나는 지점은 재설계 신호로 본다.)`;
 }
 
 function rulesBlock(rules: LabRule[]): string {
@@ -27,7 +38,7 @@ function rulesBlock(rules: LabRule[]): string {
 }
 
 export function buildStepPrompt(step: string, input: StepPromptInput): string {
-  const { manuscript, synopsis, prior, rules } = input;
+  const { manuscript, synopsis, prior, rules, authorContext } = input;
 
   switch (step) {
     case '0.5': // 시놉시스 대조 (시놉시스 있을 때만)
@@ -134,6 +145,7 @@ ${manuscript}
 
 [규칙 라이브러리]
 ${rulesBlock(rules ?? [])}
+${authorContextBlock(authorContext)}
 
 [단계 1 산출물 (settings·knowledge_states·emotion_arcs 포함)]
 ${JSON.stringify(prior['1'] ?? {}, null, 0).slice(0, 60000)}
@@ -186,6 +198,7 @@ ${manuscript}
      ④ 장르 기제가 선언만 되고 작동하지 않는다 (예: 무협 설정인데 활극이 없다, 코미디인데 웃음 장치가 드물다)
      ⑤ 삽입 콘텐츠(작중 책·강의·비급·칼럼 등)가 서사보다 비중이 커서 이야기가 운반 수단이 된다
      ⑥ 같은 교훈·정보가 에피소드 구조 없이 나열된다
+     ⑦ (작가 컨텍스트가 제공된 경우) 기획 의도와 원고의 실제 작동이 어긋난다 — 의도한 핵심 감정·반전·독자층이 원고에서 구현되지 않음
    재설계형이면 redesign 블록을 반드시 채우고, intervention_basis에 신호별 판정(강/약/없음)을 한 줄씩 기록한다. 비평형이어도 intervention_basis는 기록한다
 1. overall: 작품 단위 총평 —
    - logline: 이 소설을 한 문장으로 (누가, 무엇을 하다가, 어떻게 되는 이야기)
@@ -211,6 +224,7 @@ ${manuscript}
 
 [전체 산출물]
 ${JSON.stringify(prior, null, 0).slice(0, 90000)}
+${authorContextBlock(authorContext)}
 
 [출력 JSON]
 {"intervention":"critique|redesign",
