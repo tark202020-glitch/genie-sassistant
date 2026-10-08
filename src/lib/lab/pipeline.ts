@@ -1,14 +1,10 @@
 // 피드백 랩 — 파이프라인 오케스트레이션 (분할 실행: advance 1회 = 단계 1개 = Gemini 1회)
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { createClient } from '@supabase/supabase-js';
+import { labDb as supabase } from '@/lib/lab/db';
 import { buildStepPrompt } from './prompts';
 import { rulesForMode } from './rules';
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY || '');
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-);
 
 export type LabMode = 'I' | 'D' | 'R' | 'F';
 

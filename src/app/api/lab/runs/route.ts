@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { requireAdmin } from '@/lib/lab/guard';
+import { labDb as supabase } from '@/lib/lab/db';
 import { stepsForMode, LabMode, LAB_MODELS, DEFAULT_LAB_MODEL } from '@/lib/lab/pipeline';
 import { RULES_VERSION } from '@/lib/lab/rules';
 import { PROMPTS_VERSION } from '@/lib/lab/prompts';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-);
 
 export const PROTOCOL_VERSION = '초고수정 프로토콜 v0.2';
 
