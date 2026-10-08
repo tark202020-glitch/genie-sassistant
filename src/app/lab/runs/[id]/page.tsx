@@ -43,10 +43,25 @@ function verdictOf(item: Item): { verdict: string; reason: string | null } | nul
   return Array.isArray(v) ? (v[0] ?? null) : v;
 }
 
-function ItemCard({ item, onVerdict }: { item: Item; onVerdict: (id: string, verdict: string, reason?: string) => Promise<void> }) {
+/** 화면에서 모아두는 판정 (저장 전) */
+interface StagedVerdict {
+  verdict: 'adopted' | 'rejected' | 'disputed';
+  reason?: string;
+}
+
+const STAGED_LABEL: Record<string, string> = { adopted: '채택 예정', rejected: '기각 예정', disputed: '이견 예정' };
+
+function ItemCard({
+  item,
+  staged,
+  onStage,
+}: {
+  item: Item;
+  staged: StagedVerdict | undefined;
+  onStage: (itemId: string, verdict: StagedVerdict | null) => void;
+}) {
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState('');
-  const [busy, setBusy] = useState(false);
   const v = verdictOf(item);
   const p = item.payload;
 
@@ -55,15 +70,10 @@ function ItemCard({ item, onVerdict }: { item: Item; onVerdict: (id: string, ver
       ? `${p.kind ?? '첨삭'} (${p.loc ?? '쪽 미상'})`
       : p.type_name || p.title || p.rule_id ? `${p.rule_id ?? ''} ${p.type_name ?? p.title ?? ''}`.trim() : p.question?.slice(0, 60) || item.item_type;
 
-  const act = async (verdict: string, r?: string) => {
-    setBusy(true);
-    try {
-      await onVerdict(item.id, verdict, r);
-      setRejecting(false);
-      setReason('');
-    } finally {
-      setBusy(false);
-    }
+  const stage = (verdict: StagedVerdict['verdict'], r?: string) => {
+    onStage(item.id, { verdict, reason: r });
+    setRejecting(false);
+    setReason('');
   };
 
   return (
@@ -103,20 +113,30 @@ function ItemCard({ item, onVerdict }: { item: Item; onVerdict: (id: string, ver
               <Badge variant={v.verdict === 'adopted' ? 'default' : v.verdict === 'rejected' ? 'destructive' : 'secondary'}>
                 {{ adopted: '채택', rejected: '기각', disputed: '이견' }[v.verdict] ?? v.verdict}
               </Badge>
+            ) : staged ? (
+              <div className="flex items-center gap-1.5">
+                <Badge variant={staged.verdict === 'adopted' ? 'default' : staged.verdict === 'rejected' ? 'destructive' : 'secondary'}>
+                  {STAGED_LABEL[staged.verdict]}
+                </Badge>
+                <Button size="sm" variant="ghost" onClick={() => onStage(item.id, null)}>취소</Button>
+              </div>
             ) : (
               <div className="flex gap-1">
-                <Button size="sm" disabled={busy} onClick={() => act('adopted')}>채택</Button>
-                <Button size="sm" variant="outline" disabled={busy} onClick={() => setRejecting(!rejecting)}>기각</Button>
-                <Button size="sm" variant="secondary" disabled={busy} onClick={() => act('disputed')}>이견</Button>
+                <Button size="sm" onClick={() => stage('adopted')}>채택</Button>
+                <Button size="sm" variant="outline" onClick={() => setRejecting(!rejecting)}>기각</Button>
+                <Button size="sm" variant="secondary" onClick={() => stage('disputed')}>이견</Button>
               </div>
             )}
           </div>
         </div>
         {v?.reason && <p className="text-xs text-muted-foreground">기각 사유: {v.reason}</p>}
-        {rejecting && !v && (
+        {staged?.verdict === 'rejected' && staged.reason && !v && (
+          <p className="text-xs text-muted-foreground">기각 사유(대기): {staged.reason}</p>
+        )}
+        {rejecting && !v && !staged && (
           <div className="flex gap-2">
             <Textarea rows={1} placeholder="기각 이유 (필수)" value={reason} onChange={(e) => setReason(e.target.value)} />
-            <Button size="sm" disabled={busy || !reason.trim()} onClick={() => act('rejected', reason)}>
+            <Button size="sm" disabled={!reason.trim()} onClick={() => stage('rejected', reason)}>
               확정
             </Button>
           </div>
@@ -145,13 +165,41 @@ export default function RunDetailPage() {
     load();
   }, [load]);
 
-  const handleVerdict = async (itemId: string, verdict: string, reason?: string) => {
-    const res = await fetch(`/api/lab/items/${itemId}/verdict`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ verdict, reason }),
+  // 판정은 로컬에 모았다가(staged) 일괄 저장한다 — 클릭마다 서버에 쓰지 않는다
+  const [staged, setStaged] = useState<Record<string, StagedVerdict>>({});
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+
+  const handleStage = (itemId: string, verdict: StagedVerdict | null) => {
+    setStaged((prev) => {
+      const next = { ...prev };
+      if (verdict) next[itemId] = verdict;
+      else delete next[itemId];
+      return next;
     });
-    if (res.ok) await load();
+  };
+
+  const handleBatchSave = async () => {
+    setSaving(true);
+    setSaveError('');
+    try {
+      const res = await fetch('/api/lab/verdicts/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          verdicts: Object.entries(staged).map(([item_id, v]) => ({ item_id, verdict: v.verdict, reason: v.reason })),
+        }),
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        setSaveError(body?.error ?? '일괄 저장에 실패했습니다.');
+        return;
+      }
+      setStaged({});
+      await load();
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleResume = async () => {
@@ -193,6 +241,7 @@ export default function RunDetailPage() {
   const { run, steps, items } = data;
   const stepOrder = steps.map((s) => s.step).sort((a, b) => parseFloat(a) - parseFloat(b));
   const judged = items.filter((i) => verdictOf(i)).length;
+  const stagedCount = Object.keys(staged).length;
 
   return (
     <div className="space-y-4">
@@ -270,7 +319,9 @@ export default function RunDetailPage() {
                       {['4', '5'].includes(s) === false && stepItems.length > 0 && (
                         <p className="text-sm font-medium text-muted-foreground mt-2">판정 항목</p>
                       )}
-                      {stepItems.map((it) => <ItemCard key={it.id} item={it} onVerdict={handleVerdict} />)}
+                      {stepItems.map((it) => (
+                        <ItemCard key={it.id} item={it} staged={staged[it.id]} onStage={handleStage} />
+                      ))}
                     </div>
                   )}
                 </>
@@ -281,6 +332,20 @@ export default function RunDetailPage() {
           );
         })}
       </Tabs>
+
+      {stagedCount > 0 && (
+        <div className="sticky bottom-3 z-10 flex items-center gap-3 rounded-lg border bg-background/95 px-4 py-2.5 shadow-lg">
+          <span className="text-sm font-medium">판정 대기 {stagedCount}건</span>
+          <span className="text-xs text-muted-foreground">저장 전까지 서버에 반영되지 않습니다</span>
+          <div className="ml-auto flex gap-2">
+            <Button size="sm" variant="outline" disabled={saving} onClick={() => setStaged({})}>모두 취소</Button>
+            <Button size="sm" disabled={saving} onClick={handleBatchSave}>
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : `일괄 저장 (${stagedCount}건)`}
+            </Button>
+          </div>
+        </div>
+      )}
+      {saveError && <p className="text-sm text-destructive">{saveError}</p>}
     </div>
   );
 }
