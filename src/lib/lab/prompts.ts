@@ -3,12 +3,12 @@
 
 import { LabRule } from './rules';
 
-export const PROMPTS_VERSION = 'prompts-2026-10-09.11 (작가 컨텍스트 입력 반영)';
+export const PROMPTS_VERSION = 'prompts-2026-10-09.12 (수정고 첨삭 모드 + 파란장미 골드)';
 
 /** 모든 단계 공통 제약 (설계문서 §12) */
 const COMMON = `당신은 소설 편집 보조 에이전트 '지작'이다. 반드시 지켜야 할 제약:
 - 모든 판정에는 evidence(원고의 쪽 번호와 원문 인용)를 붙인다. 원고에 없는 문장을 인용하면 안 된다(생성 인용 금지).
-- 장면·문장 단위의 대체 문장을 쓰지 않는다. 방향(direction)만 제시한다. (단, 재설계형 개입이 필요한 원고에서는 설계 수준 — 테마·목차·용어·시놉시스 골격 — 의 수정안 제시가 허용된다. 그 경우에도 본문 문장은 쓰지 않는다)
+- 장면·문장 단위의 대체 문장을 쓰지 않는다. 방향(direction)만 제시한다. (예외 두 가지: ① 재설계형 개입이 필요한 원고에서는 설계 수준 — 테마·목차·용어·시놉시스 골격 — 의 수정안 제시가 허용된다. 그 경우에도 본문 문장은 쓰지 않는다 ② 수정고 첨삭 작업의 line_edits.suggestion 필드에 한해 문장 다듬기 제안이 허용된다 — 반드시 원문 quote와 병기)
 - 단정하지 말아야 할 것은 질문으로 남긴다.
 - 출력은 지정된 JSON 스키마만. 설명 문장을 JSON 밖에 쓰지 않는다.
 - 쪽 번호는 원고에 표기된 것을 그대로 쓴다. 쪽 표기가 없으면 "쪽 미상"으로 두고 장면 순번을 쓴다.`;
@@ -18,6 +18,8 @@ export interface StepPromptInput {
   synopsis?: string | null;
   /** 작가 컨텍스트 — 이력·기존 작품·기획 의도·협업 메모 (원고 단위, 선택) */
   authorContext?: string | null;
+  /** 실행 모드 — R(수정고)이면 단계 4·6이 첨삭 중심으로 전환된다 */
+  mode?: string;
   prior: Record<string, unknown>; // 이전 단계 output 모음 (키: step)
   rules?: LabRule[];
 }
@@ -37,8 +39,17 @@ function rulesBlock(rules: LabRule[]): string {
     .join('\n');
 }
 
+/** 수정고 첨삭 블록 — R 모드의 단계 4에만 삽입 (파란장미 2차 피드백 골드 유형) */
+const R_LINE_EDIT_BLOCK = `
+[추가 작업: 수정고 첨삭 — line_edits]
+이 원고는 수정고다. 결함 탐지와 별도로, 전문 편집자가 수정고에 다는 첨삭 코멘트를 수집한다.
+- kind 분류: 개연성(논리·인과 질문 — 예: "유애는 왜 하다훈에게서 도망쳤나?") | 고증(물리·절차·현실 디테일 — 예: "폭발 먼지는 꽤 오래 지속된다") | 인물일관성(능력·반응이 확립된 설정과 어긋남 — 예: "위기 대응 능력이 너무 뛰어난 건 아닌지") | 동기공백(행동의 이유가 비어 있음) | 화법(인물의 성별·연령·처지에 맞지 않는 어휘 — 예: "여성들이 잘 사용하지 않는 표현") | 복선제안(기존 사물·장면을 복선으로 쓸 기회 — 예: "그 책이 서수잔이나 고부도의 책이면 복선으로 쓸 수 있다") | 시간흐름(장면 사이 시간 경과·타이밍 불일치)
+- 각 항목: loc(쪽) + quote(원문 인용) + comment(지적 — 단정보다 질문형) + suggestion(필요할 때만 다듬은 문장 제안. 이 필드에 한해 본문 문장 허용, 원문과 병기되므로 원문의 어휘·톤을 유지한 최소 수정)
+- 전수 첨삭이 아니라 대표 사례 중심으로 최대 30건. 같은 유형이 반복되면 집중 구간(쪽 범위)을 comment에 명시하고 대표 사례만 수집한다.`;
+
 export function buildStepPrompt(step: string, input: StepPromptInput): string {
-  const { manuscript, synopsis, prior, rules, authorContext } = input;
+  const { manuscript, synopsis, prior, rules, authorContext, mode } = input;
+  const isRevision = mode === 'R';
 
   switch (step) {
     case '0.5': // 시놉시스 대조 (시놉시스 있을 때만)
@@ -145,6 +156,7 @@ ${manuscript}
 
 [규칙 라이브러리]
 ${rulesBlock(rules ?? [])}
+${isRevision ? R_LINE_EDIT_BLOCK : ''}
 ${authorContextBlock(authorContext)}
 
 [단계 1 산출물 (settings·knowledge_states·emotion_arcs 포함)]
@@ -161,7 +173,8 @@ ${manuscript}
 
 [출력 JSON]
 {"issues":[{"issue_id":"I-01","rule_id":"R25","category":"","grade":"A|B|C","scope":"scene|part|cross_part|design","loc":"쪽","evidence":[{"loc":"","quote":""}],"knowledge_conflict":null,"diagnosis":"무엇이 문제인가","direction":"방향","linked_strengths":[]}],
-"mandatory_checks":[{"rule_id":"R16","result":"결함 보고(issue_id) 또는 해당 없음","basis":"한 줄 근거"},{"rule_id":"R25","result":"","basis":""},{"rule_id":"R38","result":"","basis":""},{"rule_id":"R39","result":"","basis":""}]}`;
+"mandatory_checks":[{"rule_id":"R16","result":"결함 보고(issue_id) 또는 해당 없음","basis":"한 줄 근거"},{"rule_id":"R25","result":"","basis":""},{"rule_id":"R38","result":"","basis":""},{"rule_id":"R39","result":"","basis":""}]${isRevision ? `,
+"line_edits":[{"edit_id":"E-01","kind":"개연성|고증|인물일관성|동기공백|화법|복선제안|시간흐름","loc":"쪽","quote":"원문 인용","comment":"지적·질문","suggestion":null}]` : ''}}`;
 
     case '5': // 물음표 분류
       return `${COMMON}
@@ -199,7 +212,10 @@ ${manuscript}
      ⑤ 삽입 콘텐츠(작중 책·강의·비급·칼럼 등)가 서사보다 비중이 커서 이야기가 운반 수단이 된다
      ⑥ 같은 교훈·정보가 에피소드 구조 없이 나열된다
      ⑦ (작가 컨텍스트가 제공된 경우) 기획 의도와 원고의 실제 작동이 어긋난다 — 의도한 핵심 감정·반전·독자층이 원고에서 구현되지 않음
-   재설계형이면 redesign 블록을 반드시 채우고, intervention_basis에 신호별 판정(강/약/없음)을 한 줄씩 기록한다. 비평형이어도 intervention_basis는 기록한다
+     ⑧ 설정이 분량 대비 과다해 설명이 서사를 압도하고, 복수의 설정이 같은 기능을 중복 수행한다 (R40 결과가 강하면 이 신호)
+     ⑨ 잘 알려진 기존 작품과의 유사성이 작품의 존재 이유를 위협한다 (R42 결과가 강하면 이 신호)
+   재설계형이면 redesign 블록을 반드시 채우고, intervention_basis에 신호별 판정(강/약/없음)을 한 줄씩 기록한다. 비평형이어도 intervention_basis는 기록한다${isRevision ? `
+   **수정고(R 모드) 지침**: 이 원고는 수정고다. summary에 "이번 고에서 잘 작동하는 것"과 "다음 고 체크리스트"(단계 4 line_edits의 상위 유형 포함)를 담는다. 수정고에 redesign 판정을 내릴 때는 신호 근거를 더 엄격히 요구한다 — 초고 단계에서 이미 구조 합의가 있었을 가능성을 감안한다` : ''}
 1. overall: 작품 단위 총평 —
    - logline: 이 소설을 한 문장으로 (누가, 무엇을 하다가, 어떻게 되는 이야기)
    - protagonist_arc: 주인공의 궤적 평가 (예: 추락→재기→승부수). 궤적이 모든 주요 장면에서 작동하는지, 끊기는 구간이 있으면 어디인지
@@ -213,7 +229,7 @@ ${manuscript}
    - emotion_note: 감정 흐름(emotion_arcs)에서 살릴 것 — 전환점의 계기가 구체물로 제시된 곳은 보호, 전환인데 감정 묘사가 빈 곳은 지적
 3. a_grade: A급 1~3건 — 문제·근거·방향. (있으면) 후보안은 방향 제시이지 대체 문장이 아니다
 4. setting_diff: 설정집 초안 — 원고에서 뽑은 값·충돌·공백 정리
-5. author_questions: 확인(confirm) / 고를 것(choose) / 참고(reference)로 분류한 작가 질문 목록. 설정 공백·충돌은 값을 정해주지 말고 질문으로. 후보 수치는 현실 근거와 함께 참고로만
+5. author_questions: 확인(confirm) / 고를 것(choose) / 참고(reference)로 분류한 작가 질문 목록. 설정 공백·충돌은 값을 정해주지 말고 질문으로. 후보 수치는 현실 근거와 함께 참고로만. 민감 소재(실존 집단에 대한 차별·학살, 여성의 신체·출산 통제 등)를 다루는 설정이 있는데 접근 깊이가 얕으면 reference 질문으로 경고를 남긴다 — "민감한 소재이므로 대충 접근해서는 안 된다"는 수준의 명시적 주의
 6. summary: 장점 먼저, 크게 하나의 메시지 (overall을 2~3문장으로 압축)
 7. redesign (재설계형일 때만, 아니면 null): 전문 편집자의 기획 개발 피드백처럼 설계 수준의 수정안을 제시한다. 본문 문장은 쓰지 않는다.
    - theme: 한 줄 테마 재정의 — 이 작품의 최대 반전·핵심 감정이 무엇이어야 하는지 (예: "최대 반전은 미래의 내가 아니라 아내가 쌓아온 20년")
@@ -221,6 +237,8 @@ ${manuscript}
    - term_table: 핵심 용어·은유 통일표 — 혼재된 용어를 {현재 혼재 양상 → 통일 제안 → 이유}로. 세계관 은유가 있는 원고(무협 등)는 은유 대응표(예: 무공=업무 능력)까지
    - prescriptions: 수치 처방 — 분량·빈도·연표·금액 등 구체 수치가 필요한 지점. 금액·기간은 반드시 현실 계산·통계로 검증한 수치를 제시 (예: 월 20만 적립 20년 복리 → 실수익률 적용 약 1.37억)
    - synopsis_sketch: 개정 서사 골격 — 장 흐름 순서의 뼈대 요약(각 장 1~2문장). 괄호로 (강조할 것)을 표시할 수 있다. 본문 문장·대사는 쓰지 않는다
+   - references: 실존 모델·참고자료 제안 — 인물·설정의 레퍼런스가 될 실존 인물·사건·작품·도서. 둘 이상을 합성한 인물 모델 제안도 가능 (예: 파란장미 1차 피드백 — "대만의 탕 펑 + 메그비 수석 개발자 쑨젠을 합친 인물을 고부도의 모델로", 대런 바일러 『신장 위구르 디스토피아』 추천). 어떤 문제를 풀기 위한 레퍼런스인지 target에 명시
+   - timeline_proposal: 설정 정합성이 흔들리는 원고에는 인물×연도 연표 제안 — 주요 인물별로 연도마다 나이·사건을 배치해 설정 충돌을 수치로 잠근다. 원고와 모순되는 연도가 있으면 그 지점이 바로 수정 대상
 
 [전체 산출물]
 ${JSON.stringify(prior, null, 0).slice(0, 90000)}
@@ -230,7 +248,7 @@ ${authorContextBlock(authorContext)}
 {"intervention":"critique|redesign",
 "intervention_basis":[{"signal":"①테마·최대 반전","level":"강|약|없음","note":""}],
 "overall":{"logline":"","protagonist_arc":"","structure":"","readability_pattern":""},
-"redesign":{"theme":"","toc_proposal":[{"current":"기존 장","proposed":"제안 장 — 한 줄 메시지","why":""}],"term_table":[{"from":"혼재 양상","to":"통일 제안","why":""}],"prescriptions":[{"what":"","value":"수치·상한","basis":"현실 근거·계산"}],"synopsis_sketch":""},
+"redesign":{"theme":"","toc_proposal":[{"current":"기존 장","proposed":"제안 장 — 한 줄 메시지","why":""}],"term_table":[{"from":"혼재 양상","to":"통일 제안","why":""}],"prescriptions":[{"what":"","value":"수치·상한","basis":"현실 근거·계산"}],"synopsis_sketch":"","references":[{"target":"풀려는 문제","model":"실존 인물·사건·작품·도서","how":"가져올 방법"}],"timeline_proposal":[{"year":"","entries":[{"character":"","event":"나이·사건"}]}]},
 "character_reviews":[{"character":"","label":"","core_mechanism":"","shining":[{"loc":"","why":""}],"wobbles":[{"loc":"","problem":"","direction":""}],"emotion_note":""}],
 "summary":"장점을 먼저 말하는 총평 2~3문장",
 "a_grade":[{"title":"","from_issue":"issue_id","problem":"","evidence":[{"loc":"","quote":""}],"direction":"","alternatives":[]}],

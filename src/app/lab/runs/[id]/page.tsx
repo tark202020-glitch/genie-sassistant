@@ -26,6 +26,7 @@ const TYPE_LABEL: Record<string, string> = {
   issue: '결함',
   question: '질문',
   setting: '설정',
+  line_edit: '첨삭',
 };
 
 interface Item {
@@ -50,7 +51,9 @@ function ItemCard({ item, onVerdict }: { item: Item; onVerdict: (id: string, ver
   const p = item.payload;
 
   const title =
-    p.type_name || p.title || p.rule_id ? `${p.rule_id ?? ''} ${p.type_name ?? p.title ?? ''}`.trim() : p.question?.slice(0, 60) || item.item_type;
+    item.item_type === 'line_edit'
+      ? `${p.kind ?? '첨삭'} (${p.loc ?? '쪽 미상'})`
+      : p.type_name || p.title || p.rule_id ? `${p.rule_id ?? ''} ${p.type_name ?? p.title ?? ''}`.trim() : p.question?.slice(0, 60) || item.item_type;
 
   const act = async (verdict: string, r?: string) => {
     setBusy(true);
@@ -75,8 +78,14 @@ function ItemCard({ item, onVerdict }: { item: Item; onVerdict: (id: string, ver
               <span className="font-medium text-sm">{title}</span>
             </div>
             <p className="text-sm mt-1">
-              {p.diagnosis || p.mechanism || p.question || p.protect || ''}
+              {p.diagnosis || p.mechanism || p.question || p.protect || p.comment || ''}
             </p>
+            {item.item_type === 'line_edit' && (
+              <div className="mt-1 space-y-0.5 text-xs">
+                {p.quote && <p className="text-muted-foreground border-l-2 pl-2">원문: “{p.quote}”</p>}
+                {p.suggestion && <p className="border-l-2 border-primary pl-2">제안: “{p.suggestion}”</p>}
+              </div>
+            )}
             {p.direction && <p className="text-sm text-muted-foreground">→ {p.direction}</p>}
             {item.item_type === 'setting' && p.values?.length > 0 && (
               <ul className="mt-1 space-y-0.5">

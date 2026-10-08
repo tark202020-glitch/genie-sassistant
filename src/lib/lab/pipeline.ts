@@ -84,6 +84,7 @@ function extractItems(step: string, output: any): { item_type: string; payload: 
     for (const s of output.strengths ?? []) items.push({ item_type: 'strength', payload: s });
   } else if (step === '4') {
     for (const i of output.issues ?? []) items.push({ item_type: 'issue', payload: i });
+    for (const e of output.line_edits ?? []) items.push({ item_type: 'line_edit', payload: e });
   } else if (step === '5') {
     for (const q of output.questions ?? []) {
       if (!q.resolved_in_manuscript) items.push({ item_type: 'question', payload: q });
@@ -182,6 +183,7 @@ export async function advanceRun(runId: string): Promise<AdvanceResult> {
       manuscript,
       synopsis: run.synopsis,
       authorContext,
+      mode: run.mode,
       prior,
       rules: rulesForMode(run.mode as LabMode),
     });
@@ -226,9 +228,11 @@ export async function advanceRun(runId: string): Promise<AdvanceResult> {
     const items = extractItems(next, output);
     if (items.length > 0) {
       await supabase.from('lab_items').delete().eq('run_id', runId).eq('step', next);
-      await supabase
+      const { error: itemsError } = await supabase
         .from('lab_items')
         .insert(items.map((it) => ({ run_id: runId, step: next, ...it })));
+      // 삽입 실패를 무시하면 판정 불가 상태가 조용히 지나간다 (실측: item_type CHECK 제약 누락)
+      if (itemsError) throw new Error(`판정 항목 저장 실패: ${itemsError.message}`);
     }
 
     const remaining = order.filter((s) => {

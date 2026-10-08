@@ -335,6 +335,36 @@ function Step6Extra({ out }: { out: any }) {
                 <p className="text-xs whitespace-pre-wrap">{out.redesign.synopsis_sketch}</p>
               </div>
             )}
+            {out.redesign.references?.length > 0 && (
+              <div>
+                <p className="font-medium mb-1">실존 모델·참고자료</p>
+                {out.redesign.references.map((r: any, i: number) => (
+                  <p key={i} className="text-xs border-l-2 pl-2 mb-1">
+                    {r.target}: <b>{r.model}</b> <span className="text-muted-foreground">— {r.how}</span>
+                  </p>
+                ))}
+              </div>
+            )}
+            {out.redesign.timeline_proposal?.length > 0 && (
+              <div>
+                <p className="font-medium mb-1">인물×연도 연표 제안</p>
+                <table className="w-full text-xs">
+                  <thead><tr><Th>연도</Th><Th>인물별 사건</Th></tr></thead>
+                  <tbody>
+                    {out.redesign.timeline_proposal.map((t: any, i: number) => (
+                      <tr key={i}>
+                        <Td><span className="whitespace-nowrap">{t.year}</span></Td>
+                        <Td>
+                          {(t.entries ?? []).map((e: any, j: number) => (
+                            <p key={j}><b>{e.character}</b> — {e.event}</p>
+                          ))}
+                        </Td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </Section>
       )}
