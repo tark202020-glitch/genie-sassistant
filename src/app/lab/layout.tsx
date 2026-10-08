@@ -9,7 +9,8 @@ export default async function LabLayout({ children }: { children: React.ReactNod
   if (!user) notFound(); // 비관리자에게는 페이지 존재 자체를 숨긴다
 
   return (
-    <div className="min-h-screen bg-background">
+    // 랩은 다크 모드 고정 — 전역 테마와 무관하게 dark 변수 스코프를 강제한다
+    <div className="dark min-h-screen bg-background text-foreground">
       <header className="border-b px-6 py-3 flex items-center gap-6">
         <Link href="/lab" className="font-bold text-lg">
           피드백 랩

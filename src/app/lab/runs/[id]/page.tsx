@@ -29,6 +29,17 @@ const TYPE_LABEL: Record<string, string> = {
   line_edit: '첨삭',
 };
 
+/** 카드 왼쪽 색 띠 — 유형·등급별 구분 */
+function accentOf(item: Item): string {
+  const p = item.payload;
+  if (item.item_type === 'strength') return '#34d399';
+  if (item.item_type === 'issue') return p.grade === 'A' ? '#f87171' : p.grade === 'B' ? '#fbbf24' : '#94a3b8';
+  if (item.item_type === 'line_edit') return '#a78bfa';
+  if (item.item_type === 'question') return '#22d3ee';
+  if (item.item_type === 'setting') return p.status === '충돌' ? '#f87171' : p.status === '공백' ? '#fbbf24' : '#34d399';
+  return '#64748b';
+}
+
 interface Item {
   id: string;
   step: string;
@@ -77,7 +88,7 @@ function ItemCard({
   };
 
   return (
-    <Card className={v ? 'opacity-90' : ''}>
+    <Card className={v ? 'opacity-80' : ''} style={{ borderLeft: `4px solid ${accentOf(item)}` }}>
       <CardContent className="pt-4 space-y-2">
         <div className="flex items-start justify-between gap-2">
           <div>
