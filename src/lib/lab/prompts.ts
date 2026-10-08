@@ -3,7 +3,7 @@
 
 import { LabRule } from './rules';
 
-export const PROMPTS_VERSION = 'prompts-2026-10-09.9 (개입 강도 2모드: 비평형/재설계형)';
+export const PROMPTS_VERSION = 'prompts-2026-10-09.10 (재설계 판정 신호 보강 + R39 생략 금지)';
 
 /** 모든 단계 공통 제약 (설계문서 §12) */
 const COMMON = `당신은 소설 편집 보조 에이전트 '지작'이다. 반드시 지켜야 할 제약:
@@ -127,7 +127,7 @@ ${manuscript}
 - R36은 현재형 서술이 쓰인 구간을 "공정 장면(실시간 진행)"과 "그 외"로 나눠, 그 외 구간의 현재형 사용과 전환 규칙 부재를 검사한다.
 - R37은 정보 없는 발화·행동 지시문('말한다', '고개를 든다' 류)의 반복을 세고, 집중 구간을 짚는다.
 - R38은 원고 전체에서 반복 제기되는 핵심 질문(예: "왜 그랬나")을 찾아, 답이 변주·심화 없이 동일하게 반복되는지 검사한다.
-- **생략 금지 규칙**: R16(실존 기업·인물·브랜드명 전수 검사), R25(지식 상태 전이), R38(답 반복)은 다른 결함이 많아도 반드시 검사하고, 결함이 없으면 mandatory_checks에 "해당 없음"과 그 근거를 한 줄로 기록한다. 이 세 규칙의 검사 결과가 빠진 출력은 불완전한 출력이다.
+- **생략 금지 규칙**: R16(실존 기업·인물·브랜드명 전수 검사), R25(지식 상태 전이), R38(답 반복), R39(용어·은유 통일)는 다른 결함이 많아도 반드시 검사하고, 결함이 없으면 mandatory_checks에 "해당 없음"과 그 근거를 한 줄로 기록한다. 이 네 규칙의 검사 결과가 빠진 출력은 불완전한 출력이다.
 - 등급: A(구조를 흔드는 것, 1~3건만) / B(장면 단위) / C(문장 단위).
 - 결함은 반드시 연결된 장점(linked_strengths)을 확인하고, 장점을 훼손하는 수정 방향은 내지 않는다.
 - 대체 문장 금지. direction은 "무엇을 어느 방향으로"까지만.
@@ -149,7 +149,7 @@ ${manuscript}
 
 [출력 JSON]
 {"issues":[{"issue_id":"I-01","rule_id":"R25","category":"","grade":"A|B|C","scope":"scene|part|cross_part|design","loc":"쪽","evidence":[{"loc":"","quote":""}],"knowledge_conflict":null,"diagnosis":"무엇이 문제인가","direction":"방향","linked_strengths":[]}],
-"mandatory_checks":[{"rule_id":"R16","result":"결함 보고(issue_id) 또는 해당 없음","basis":"한 줄 근거"},{"rule_id":"R25","result":"","basis":""},{"rule_id":"R38","result":"","basis":""}]}`;
+"mandatory_checks":[{"rule_id":"R16","result":"결함 보고(issue_id) 또는 해당 없음","basis":"한 줄 근거"},{"rule_id":"R25","result":"","basis":""},{"rule_id":"R38","result":"","basis":""},{"rule_id":"R39","result":"","basis":""}]}`;
 
     case '5': // 물음표 분류
       return `${COMMON}
@@ -177,8 +177,16 @@ ${manuscript}
 **완성 여부 고지(필수)**: 단계 1의 completeness가 미완성(is_complete=false)이면 summary의 첫 문장은 반드시 "이 피드백은 〔scope〕 기준의 잠정 피드백"임을 알리는 문장으로 시작하고, overall.structure와 복선(planted) 회수 판단에는 "전체 완성 후 재평가 필요"를 명시하며 결말 평가를 단정하지 않는다.
 
 0. intervention: 개입 강도 판정 — 이 원고에 필요한 피드백의 종류를 먼저 정한다.
-   - "critique"(비평형): 구조가 서 있는 원고. 장점 보호와 결함 지적 중심 (기본값)
-   - "redesign"(재설계형): 다음 중 둘 이상이면 선택 — ① 중심 테마·최대 반전이 서 있지 않다 ② 핵심 설정·용어 체계가 혼재되어 작품의 뼈대가 흔들린다 ③ 추진 질문이 중간에 길을 잃고 장들의 역할이 겹친다 ④ 장르 기제가 선언만 되고 작동하지 않는다. 재설계형이면 redesign 블록을 반드시 채운다
+   **주의: 판정 질문은 "이 원고의 구조를 좋게 설명할 수 있는가"가 아니라 "편집자가 설계에 개입해야 더 좋은 책이 되는가"다. 원고를 호의적으로 요약하는 능력과 재설계 필요성은 별개다.**
+   - "critique"(비평형): 구조가 서 있는 원고. 장점 보호와 결함 지적 중심
+   - "redesign"(재설계형): 다음 신호를 각각 검사해 둘 이상이 강하면 선택 (하나만 강해도 고려) —
+     ① 중심 테마·최대 반전이 서 있지 않다 (주인공 외 핵심 인물의 서사가 반전·보상에 기여하지 못하면 이 신호)
+     ② 핵심 설정·용어 체계가 혼재 (R39 결과가 혼재면 이 신호)
+     ③ 추진 질문이 중간에 길을 잃거나 장들의 역할이 겹친다
+     ④ 장르 기제가 선언만 되고 작동하지 않는다 (예: 무협 설정인데 활극이 없다, 코미디인데 웃음 장치가 드물다)
+     ⑤ 삽입 콘텐츠(작중 책·강의·비급·칼럼 등)가 서사보다 비중이 커서 이야기가 운반 수단이 된다
+     ⑥ 같은 교훈·정보가 에피소드 구조 없이 나열된다
+   재설계형이면 redesign 블록을 반드시 채우고, intervention_basis에 신호별 판정(강/약/없음)을 한 줄씩 기록한다. 비평형이어도 intervention_basis는 기록한다
 1. overall: 작품 단위 총평 —
    - logline: 이 소설을 한 문장으로 (누가, 무엇을 하다가, 어떻게 되는 이야기)
    - protagonist_arc: 주인공의 궤적 평가 (예: 추락→재기→승부수). 궤적이 모든 주요 장면에서 작동하는지, 끊기는 구간이 있으면 어디인지
@@ -206,6 +214,7 @@ ${JSON.stringify(prior, null, 0).slice(0, 90000)}
 
 [출력 JSON]
 {"intervention":"critique|redesign",
+"intervention_basis":[{"signal":"①테마·최대 반전","level":"강|약|없음","note":""}],
 "overall":{"logline":"","protagonist_arc":"","structure":"","readability_pattern":""},
 "redesign":{"theme":"","toc_proposal":[{"current":"기존 장","proposed":"제안 장 — 한 줄 메시지","why":""}],"term_table":[{"from":"혼재 양상","to":"통일 제안","why":""}],"prescriptions":[{"what":"","value":"수치·상한","basis":"현실 근거·계산"}],"synopsis_sketch":""},
 "character_reviews":[{"character":"","label":"","core_mechanism":"","shining":[{"loc":"","why":""}],"wobbles":[{"loc":"","problem":"","direction":""}],"emotion_note":""}],
