@@ -301,7 +301,13 @@ function Step6Extra({ out }: { out: any }) {
               <p><Badge variant="destructive" className="mr-2">테마 재정의</Badge>{out.redesign.theme}</p>
             )}
             {out.redesign.title_proposal && (
-              <p><Badge variant="secondary" className="mr-2">제목 제안</Badge>{out.redesign.title_proposal}</p>
+              <p>
+                <Badge variant="secondary" className="mr-2">제목 제안</Badge>
+                {Array.isArray(out.redesign.title_proposal) ? out.redesign.title_proposal.join(' / ') : out.redesign.title_proposal}
+              </p>
+            )}
+            {out.redesign.chapter_template && (
+              <p><Badge variant="secondary" className="mr-2">꼭지 템플릿</Badge>{out.redesign.chapter_template}</p>
             )}
             {out.redesign.toc_proposal?.length > 0 && (
               <div>
