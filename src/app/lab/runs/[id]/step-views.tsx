@@ -300,6 +300,9 @@ function Step6Extra({ out }: { out: any }) {
             {out.redesign.theme && (
               <p><Badge variant="destructive" className="mr-2">테마 재정의</Badge>{out.redesign.theme}</p>
             )}
+            {out.redesign.title_proposal && (
+              <p><Badge variant="secondary" className="mr-2">제목 제안</Badge>{out.redesign.title_proposal}</p>
+            )}
             {out.redesign.toc_proposal?.length > 0 && (
               <div>
                 <p className="font-medium mb-1">목차 수정안</p>

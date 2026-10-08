@@ -1,3 +1,3 @@
 // 피드백 에이전트 버전 — 프롬프트·규칙·판정 체계의 묶음 버전.
 // 올릴 때마다 doc/V2/피드백에이전트_버전이력.md 에 변경 내용을 기록한다.
-export const AGENT_VERSION = 'FA-0.13';
+export const AGENT_VERSION = 'FA-0.15';
