@@ -294,6 +294,50 @@ function Step6Extra({ out }: { out: any }) {
           </table>
         </Section>
       )}
+      {out.intervention === 'redesign' && out.redesign && (
+        <Section title="재설계 제안 (구조가 아직 서지 않은 원고로 판정됨)">
+          <div className="space-y-3 text-sm">
+            {out.redesign.theme && (
+              <p><Badge variant="destructive" className="mr-2">테마 재정의</Badge>{out.redesign.theme}</p>
+            )}
+            {out.redesign.toc_proposal?.length > 0 && (
+              <div>
+                <p className="font-medium mb-1">목차 수정안</p>
+                <table className="w-full text-xs">
+                  <thead><tr><Th>기존</Th><Th>제안</Th><Th>이유</Th></tr></thead>
+                  <tbody>
+                    {out.redesign.toc_proposal.map((t: any, i: number) => (
+                      <tr key={i}><Td>{t.current}</Td><Td><b>{t.proposed}</b></Td><Td>{t.why}</Td></tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {out.redesign.term_table?.length > 0 && (
+              <div>
+                <p className="font-medium mb-1">용어·은유 통일표</p>
+                {out.redesign.term_table.map((t: any, i: number) => (
+                  <p key={i} className="text-xs border-l-2 pl-2 mb-1">{t.from} → <b>{t.to}</b> <span className="text-muted-foreground">({t.why})</span></p>
+                ))}
+              </div>
+            )}
+            {out.redesign.prescriptions?.length > 0 && (
+              <div>
+                <p className="font-medium mb-1">수치 처방</p>
+                {out.redesign.prescriptions.map((p: any, i: number) => (
+                  <p key={i} className="text-xs border-l-2 pl-2 mb-1">{p.what}: <b>{p.value}</b> <span className="text-muted-foreground">— {p.basis}</span></p>
+                ))}
+              </div>
+            )}
+            {out.redesign.synopsis_sketch && (
+              <div>
+                <p className="font-medium mb-1">개정 서사 골격</p>
+                <p className="text-xs whitespace-pre-wrap">{out.redesign.synopsis_sketch}</p>
+              </div>
+            )}
+          </div>
+        </Section>
+      )}
       {out.character_reviews?.length > 0 && (
         <Section title="확실히 좋아서 더 살리고 싶은 것 — 인물별">
           <div className="space-y-3">

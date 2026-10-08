@@ -3,12 +3,12 @@
 
 import { LabRule } from './rules';
 
-export const PROMPTS_VERSION = 'prompts-2026-10-07.8 (핵심 규칙 검사 보고 강제)';
+export const PROMPTS_VERSION = 'prompts-2026-10-09.9 (개입 강도 2모드: 비평형/재설계형)';
 
 /** 모든 단계 공통 제약 (설계문서 §12) */
 const COMMON = `당신은 소설 편집 보조 에이전트 '지작'이다. 반드시 지켜야 할 제약:
 - 모든 판정에는 evidence(원고의 쪽 번호와 원문 인용)를 붙인다. 원고에 없는 문장을 인용하면 안 된다(생성 인용 금지).
-- 대체 문장·대체 장면을 쓰지 않는다. 방향(direction)만 제시한다.
+- 장면·문장 단위의 대체 문장을 쓰지 않는다. 방향(direction)만 제시한다. (단, 재설계형 개입이 필요한 원고에서는 설계 수준 — 테마·목차·용어·시놉시스 골격 — 의 수정안 제시가 허용된다. 그 경우에도 본문 문장은 쓰지 않는다)
 - 단정하지 말아야 할 것은 질문으로 남긴다.
 - 출력은 지정된 JSON 스키마만. 설명 문장을 JSON 밖에 쓰지 않는다.
 - 쪽 번호는 원고에 표기된 것을 그대로 쓴다. 쪽 표기가 없으면 "쪽 미상"으로 두고 장면 순번을 쓴다.`;
@@ -176,6 +176,9 @@ ${manuscript}
 전체 산출물을 종합해 작가에게 갈 최종 구성을 만든다. 구성 원칙: 전문 편집자의 작품 피드백처럼 ①확실히 좋아서 더 살리고 싶은 것(인물 중심) ②비어있는 설정 ③풀리지 않는 전체 질문 순서로, 장점이 결함보다 먼저다.
 **완성 여부 고지(필수)**: 단계 1의 completeness가 미완성(is_complete=false)이면 summary의 첫 문장은 반드시 "이 피드백은 〔scope〕 기준의 잠정 피드백"임을 알리는 문장으로 시작하고, overall.structure와 복선(planted) 회수 판단에는 "전체 완성 후 재평가 필요"를 명시하며 결말 평가를 단정하지 않는다.
 
+0. intervention: 개입 강도 판정 — 이 원고에 필요한 피드백의 종류를 먼저 정한다.
+   - "critique"(비평형): 구조가 서 있는 원고. 장점 보호와 결함 지적 중심 (기본값)
+   - "redesign"(재설계형): 다음 중 둘 이상이면 선택 — ① 중심 테마·최대 반전이 서 있지 않다 ② 핵심 설정·용어 체계가 혼재되어 작품의 뼈대가 흔들린다 ③ 추진 질문이 중간에 길을 잃고 장들의 역할이 겹친다 ④ 장르 기제가 선언만 되고 작동하지 않는다. 재설계형이면 redesign 블록을 반드시 채운다
 1. overall: 작품 단위 총평 —
    - logline: 이 소설을 한 문장으로 (누가, 무엇을 하다가, 어떻게 되는 이야기)
    - protagonist_arc: 주인공의 궤적 평가 (예: 추락→재기→승부수). 궤적이 모든 주요 장면에서 작동하는지, 끊기는 구간이 있으면 어디인지
@@ -191,12 +194,20 @@ ${manuscript}
 4. setting_diff: 설정집 초안 — 원고에서 뽑은 값·충돌·공백 정리
 5. author_questions: 확인(confirm) / 고를 것(choose) / 참고(reference)로 분류한 작가 질문 목록. 설정 공백·충돌은 값을 정해주지 말고 질문으로. 후보 수치는 현실 근거와 함께 참고로만
 6. summary: 장점 먼저, 크게 하나의 메시지 (overall을 2~3문장으로 압축)
+7. redesign (재설계형일 때만, 아니면 null): 전문 편집자의 기획 개발 피드백처럼 설계 수준의 수정안을 제시한다. 본문 문장은 쓰지 않는다.
+   - theme: 한 줄 테마 재정의 — 이 작품의 최대 반전·핵심 감정이 무엇이어야 하는지 (예: "최대 반전은 미래의 내가 아니라 아내가 쌓아온 20년")
+   - toc_proposal: 기존 장 구성 ↔ 제안 장 구성 비교 — 각 제안 장에 한 줄 메시지. 기존 장의 어떤 문제를 푸는 이동인지 why에 명시
+   - term_table: 핵심 용어·은유 통일표 — 혼재된 용어를 {현재 혼재 양상 → 통일 제안 → 이유}로. 세계관 은유가 있는 원고(무협 등)는 은유 대응표(예: 무공=업무 능력)까지
+   - prescriptions: 수치 처방 — 분량·빈도·연표·금액 등 구체 수치가 필요한 지점. 금액·기간은 반드시 현실 계산·통계로 검증한 수치를 제시 (예: 월 20만 적립 20년 복리 → 실수익률 적용 약 1.37억)
+   - synopsis_sketch: 개정 서사 골격 — 장 흐름 순서의 뼈대 요약(각 장 1~2문장). 괄호로 (강조할 것)을 표시할 수 있다. 본문 문장·대사는 쓰지 않는다
 
 [전체 산출물]
 ${JSON.stringify(prior, null, 0).slice(0, 90000)}
 
 [출력 JSON]
-{"overall":{"logline":"","protagonist_arc":"","structure":"","readability_pattern":""},
+{"intervention":"critique|redesign",
+"overall":{"logline":"","protagonist_arc":"","structure":"","readability_pattern":""},
+"redesign":{"theme":"","toc_proposal":[{"current":"기존 장","proposed":"제안 장 — 한 줄 메시지","why":""}],"term_table":[{"from":"혼재 양상","to":"통일 제안","why":""}],"prescriptions":[{"what":"","value":"수치·상한","basis":"현실 근거·계산"}],"synopsis_sketch":""},
 "character_reviews":[{"character":"","label":"","core_mechanism":"","shining":[{"loc":"","why":""}],"wobbles":[{"loc":"","problem":"","direction":""}],"emotion_note":""}],
 "summary":"장점을 먼저 말하는 총평 2~3문장",
 "a_grade":[{"title":"","from_issue":"issue_id","problem":"","evidence":[{"loc":"","quote":""}],"direction":"","alternatives":[]}],
