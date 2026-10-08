@@ -78,7 +78,16 @@ function ItemCard({ item, onVerdict }: { item: Item; onVerdict: (id: string, ver
               {p.diagnosis || p.mechanism || p.question || p.protect || ''}
             </p>
             {p.direction && <p className="text-sm text-muted-foreground">→ {p.direction}</p>}
-            <EvidenceList evidence={p.evidence ?? p.quotes ?? p.values ?? []} />
+            {item.item_type === 'setting' && p.values?.length > 0 && (
+              <ul className="mt-1 space-y-0.5">
+                {p.values.map((v: any, i: number) => (
+                  <li key={i} className="text-xs text-muted-foreground border-l-2 pl-2">
+                    <span className="font-medium">{v.loc}</span> {v.value ?? v.quote ?? ''}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <EvidenceList evidence={p.evidence ?? p.quotes ?? []} />
           </div>
           <div className="shrink-0">
             {v ? (
