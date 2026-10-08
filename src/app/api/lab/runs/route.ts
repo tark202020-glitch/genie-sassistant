@@ -4,6 +4,7 @@ import { labDb as supabase } from '@/lib/lab/db';
 import { stepsForMode, LabMode, LAB_MODELS, DEFAULT_LAB_MODEL } from '@/lib/lab/pipeline';
 import { RULES_VERSION } from '@/lib/lab/rules';
 import { PROMPTS_VERSION } from '@/lib/lab/prompts';
+import { AGENT_VERSION } from '@/lib/lab/version';
 
 
 export const PROTOCOL_VERSION = '초고수정 프로토콜 v0.2';
@@ -39,6 +40,7 @@ export async function POST(req: NextRequest) {
     .single();
 
   const versions = {
+    agent: AGENT_VERSION,
     protocol: PROTOCOL_VERSION,
     rules: RULES_VERSION,
     prompts: PROMPTS_VERSION,

@@ -67,7 +67,7 @@ export default function LabHome() {
                   <th>상태</th>
                   <th>모델</th>
                   <th>토큰 (대략 비용)</th>
-                  <th>프롬프트 버전</th>
+                  <th>에이전트</th>
                   <th></th>
                 </tr>
               </thead>
@@ -112,7 +112,9 @@ export default function LabHome() {
                         '—'
                       )}
                     </td>
-                    <td className="text-xs text-muted-foreground">{r.versions?.prompts}</td>
+                    <td className="text-xs text-muted-foreground" title={r.versions?.prompts}>
+                      {r.versions?.agent ?? '—'}
+                    </td>
                     <td className="text-right">
                       <Button variant="outline" size="sm" asChild>
                         <Link href={`/lab/runs/${r.id}`}>상세</Link>
