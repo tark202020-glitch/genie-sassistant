@@ -3,6 +3,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { labDb as supabase } from '@/lib/lab/db';
 import { buildStepPrompt } from './prompts';
 import { rulesForMode, rulesForTextType } from './rules';
+import { applyTextTypeChoice, priorForPrompt, textTypeChoiceOf } from './text-type';
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY || '');
 
@@ -62,23 +63,6 @@ function normalizeOutput(step: string, parsed: any): any {
     '6': 'a_grade',
   };
   return { [rootKey[step] ?? 'items']: parsed };
-}
-
-/** 작가가 지정한 글 종류 — 실행 설정(versions.text_type_choice). 자동 판별이면 null */
-function textTypeChoiceOf(versions: any): 'fiction' | 'essay' | null {
-  const c = versions?.text_type_choice;
-  return c === 'fiction' || c === 'essay' ? c : null;
-}
-
-/**
- * 단계 1의 text_type에 결정 방식을 기록한다. 작가 지정이면 type을 지정값으로 고정하고 모델 판별은 detected에 남긴다.
- * 이후 단계의 프롬프트와 규칙 필터(rulesForTextType)는 모두 이 type을 따른다.
- */
-function applyTextTypeChoice(output: any, choice: 'fiction' | 'essay' | null) {
-  const tt = output.text_type ?? {};
-  output.text_type = choice
-    ? { ...tt, detected: tt.type, type: choice, decided_by: 'author' }
-    : { ...tt, decided_by: 'auto' };
 }
 
 function parseJson(text: string): any {
@@ -201,7 +185,7 @@ export async function advanceRun(runId: string): Promise<AdvanceResult> {
       synopsis: run.synopsis,
       authorContext,
       mode: run.mode,
-      prior,
+      prior: priorForPrompt(prior),
       rules: rulesForTextType(rulesForMode(run.mode as LabMode), (prior['1'] as any)?.text_type?.type),
       textTypeChoice: textTypeChoiceOf(run.versions),
     });

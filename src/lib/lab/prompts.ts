@@ -3,7 +3,7 @@
 
 import { LabRule } from './rules';
 
-export const PROMPTS_VERSION = 'prompts-2026-10-09.21 (글 종류 적합 비중 측정·작가 지정)';
+export const PROMPTS_VERSION = 'prompts-2026-10-09.22 (글 종류 적합 비중 측정·작가 지정 — 전 단계 분기 기준 고정)';
 
 /** 모든 단계 공통 제약 (설계문서 §12) */
 const COMMON = `당신은 소설 편집 보조 에이전트 '지작'이다. 반드시 지켜야 할 제약:
@@ -28,10 +28,15 @@ export interface StepPromptInput {
   textTypeChoice?: 'fiction' | 'essay' | null;
 }
 
-/** 글 종류 지정 블록 — 작가가 직접 고른 경우에만 단계 1에 삽입 */
-function textTypeChoiceBlock(choice?: 'fiction' | 'essay' | null): string {
+/** 글 종류 지정 블록 — 작가가 직접 고른 경우에만 삽입. 단계 1은 측정 지침까지, 이후 단계는 분기 기준만 */
+function textTypeChoiceBlock(choice: 'fiction' | 'essay' | null | undefined, step: string): string {
   if (!choice) return '';
   const label = choice === 'fiction' ? '소설' : '에세이·실용서';
+  if (step !== '1') {
+    return `
+[작가 지정 — 글 종류]
+작가가 이 원고의 글 종류를 '${label}'로 지정했다. 원고의 인상과 무관하게 모든 분기(소설 전용·에세이 전용 규칙과 검사 포함)는 '${label}' 기준으로만 수행한다.`;
+  }
   return `
 [작가 지정 — 글 종류]
 작가가 이 원고의 글 종류를 '${label}'로 지정했다. 구조화(장면/꼭지 분할, story_spine 작성 여부 포함)는 '${label}' 기준으로 수행한다.
@@ -74,10 +79,12 @@ const R_LINE_EDIT_BLOCK = `
 export function buildStepPrompt(step: string, input: StepPromptInput): string {
   const { manuscript, synopsis, prior, rules, authorContext, mode, textTypeChoice } = input;
   const isRevision = mode === 'R';
+  // 모든 단계 공통 제약 + 작가가 지정한 글 종류
+  const common = COMMON + textTypeChoiceBlock(textTypeChoice, step);
 
   switch (step) {
     case '0.5': // 시놉시스 대조 (시놉시스 있을 때만)
-      return `${COMMON}
+      return `${common}
 
 [작업: 단계 0.5 — 시놉시스 대조]
 작가가 제공한 시놉시스와 원고가 갈라진 지점을 찾는다. 원고가 우선한다는 전제로, 갈라짐은 결함이 아니라 확인 대상이다.
@@ -92,8 +99,8 @@ ${manuscript}
 {"divergences":[{"item":"항목명","synopsis_state":"시놉시스의 서술","manuscript_state":"원고의 서술","evidence":[{"loc":"쪽","quote":"원문 인용"}]}]}`;
 
     case '1': // 구조화
-      return `${COMMON}
-${textTypeChoiceBlock(textTypeChoice)}
+      return `${common}
+
 [작업: 단계 1 — 구조화]
 가장 먼저 두 가지를 판별한다:
 ① text_type: 이 원고가 소설(fiction)인가, 에세이·실용서(essay)인가. 근거와 함께 기록한다 — 이후 모든 단계에서 적용 규칙·분석 축이 달라진다.
@@ -126,7 +133,7 @@ ${manuscript}
 "story_spine":{"catalyst":{"loc":"쪽 또는 부재","percent":0,"summary":""},"central_question":"","turning_point_1":{"loc":"","percent":0,"summary":""},"midpoint":{"loc":"","percent":0,"summary":""},"low_point":{"loc":"","percent":0,"summary":"","new_info_follows":true},"climax":{"loc":"","percent":0,"summary":""},"note":"비율 이탈·부재 메모"}}`;
 
     case '2': // 문체 프로파일
-      return `${COMMON}
+      return `${common}
 
 [작업: 단계 2 — 문체 프로파일]
 원고가 스스로 세운 약속을 파악한다. 이것이 이후 장점·결함 판정의 유일한 기준이 된다.
@@ -143,7 +150,7 @@ ${manuscript}
 {"style_profile":{"pov":"","tense":"","scene_dialogue_summary_ratio":"","narrator_target":"인물 또는 세계 — 둘 다면 비중이 큰 쪽을 먼저 쓰고 한 문장으로 근거","genre_signals":[{"signal":"","mechanism":"","evidence":[{"loc":"","quote":""}]}],"focal_characters":[{"scene_id":"","character":""}],"promises":["원고가 세운 약속을 한 문장씩"]}}`;
 
     case '3': // 장점 추출
-      return `${COMMON}
+      return `${common}
 
 [작업: 단계 3 — 장점 추출]
 원고 자기 기준(단계 2의 약속)으로 장점을 추출한다. 장점이 결함보다 먼저다.
@@ -173,7 +180,7 @@ ${manuscript}
 "planted":[{"name":"","loc":"","quote":"","expected_fire":"어떻게 격발될 수 있는지"}]}`;
 
     case '4': // 결함 탐지
-      return `${COMMON}
+      return `${common}
 
 [작업: 단계 4 — 결함 탐지]
 아래 규칙 라이브러리로 결함을 탐지한다. 실행 순서: R26 → R25 → R35 → R17·R18 → R8 → R30 → R36·R37·R38 → 나머지.
@@ -213,7 +220,7 @@ ${manuscript}
 "line_edits":[{"edit_id":"E-01","kind":"개연성|고증|인물일관성|동기공백|화법|복선제안|시간흐름|연속성|위치이동|압축","loc":"쪽","quote":"원문 인용","comment":"지적·질문","suggestion":null}]` : ''}}`;
 
     case '5': // 물음표 분류
-      return `${COMMON}
+      return `${common}
 
 [작업: 단계 5 — 물음표 분류]
 단계 4까지 해결되지 않은 의문을 분류한다. 분류 전에 반드시 "원고 안에 답이 있는가"를 검사하고, 있으면 resolved로 표시한다.
@@ -231,7 +238,7 @@ ${manuscript}
 {"questions":[{"q_id":"Q-01","type":"info|setting|ask_author|propose|design","resolved_in_manuscript":false,"resolution_loc":null,"question":"작가에게 보낼 질문 문장","context":"왜 묻는가","evidence":[{"loc":"","quote":""}]}]}`;
 
     case '6': // 업그레이드 방향 — 작품 단위 총평 + 인물 중심 구성
-      return `${COMMON}
+      return `${common}
 
 [작업: 단계 6 — 업그레이드 방향]
 전체 산출물을 종합해 작가에게 갈 최종 구성을 만든다. 구성 원칙: 전문 편집자의 작품 피드백처럼 ①확실히 좋아서 더 살리고 싶은 것(인물 중심) ②비어있는 설정 ③풀리지 않는 전체 질문 순서로, 장점이 결함보다 먼저다.
