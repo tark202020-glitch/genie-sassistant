@@ -459,7 +459,10 @@ function CharacterMap({ characters, arcs }: { characters: any[]; arcs: any[] }) 
   return (
     <div className="space-y-5">
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_240px]">
-        <CharacterGraph chars={chars} colors={colors} rels={rels} selected={selected} onToggle={toggle} />
+        {/* 명단이 그림보다 길어도 그림이 화면에 남도록 고정 */}
+        <div className="self-start lg:sticky lg:top-4">
+          <CharacterGraph chars={chars} colors={colors} rels={rels} selected={selected} onToggle={toggle} />
+        </div>
         <ul className="space-y-0.5 self-start">
           {chars.map((c) => {
             const col = colors.get(c.name)!;
@@ -877,14 +880,14 @@ function Step6Extra({ out }: { out: any }) {
     <div className="space-y-4">
       {out.summary && (
         <section className="rounded-xl border-2 border-foreground/15 bg-white p-6">
-          <p className="mb-3 flex items-center gap-2 text-xs font-bold tracking-widest text-foreground/70">
+          <div className="mb-3 flex items-center gap-2 text-xs font-bold tracking-widest text-foreground/70">
             총평
             {out.intervention && (
               <Badge variant={out.intervention === 'redesign' ? 'destructive' : 'secondary'}>
                 {out.intervention === 'redesign' ? '재설계형' : '비평형'}
               </Badge>
             )}
-          </p>
+          </div>
           <Prose text={out.summary} className="text-[16px]" />
         </section>
       )}
