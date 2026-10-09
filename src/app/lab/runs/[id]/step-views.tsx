@@ -3,7 +3,7 @@
 // 단계별 읽기 뷰 — 판정 항목(lab_items)이 커버하지 않는 산출물을 사람이 읽을 수 있게 렌더링
 // 디자인 원칙: 라이트 고정(/lab 레이아웃), 에이전트가 쓴 글은 KoPub 바탕(lab.css),
 //             인물별 컬러 체계 공유, 색으로 뜻을 나누는 블록에는 반드시 범례를 단다
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 
 // ── 의미색 — 판정 카드(page.tsx)·범례가 함께 쓰는 단일 출처 ──
@@ -200,11 +200,22 @@ function koSpine(text: unknown): string {
 }
 
 /** 트랙 라벨 줄 배정 — 가까운 점끼리 라벨이 겹치지 않게 아래 줄로 엇갈려 놓는다 (최대 3줄) */
-const SPINE_LABEL_GAP = 14; // 라벨 폭(80px)이 트랙에서 차지하는 대략의 % 간격
+const SPINE_LABEL_W = 80; // 라벨 폭(px) — w-20
 const SPINE_ROW_STEP = 26; // 줄 간격(px)
 
 function StorySpine({ spine }: { spine: any }) {
+  // 라벨 간격(%)은 트랙의 실제 폭에서 계산한다 — 좁은 화면일수록 더 넓게 띄운다
+  const trackRef = useRef<HTMLDivElement>(null);
+  const [trackW, setTrackW] = useState(700);
+  useEffect(() => {
+    const el = trackRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => setTrackW(entry.contentRect.width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   if (!spine) return null;
+  const labelGap = ((SPINE_LABEL_W + 6) / Math.max(trackW, 1)) * 100;
   const keys = ['catalyst', 'turning_point_1', 'midpoint', 'low_point', 'climax'];
   const items = keys
     .map((k) => ({ key: k, ...(spine[k] ?? {}) }))
@@ -215,7 +226,7 @@ function StorySpine({ spine }: { spine: any }) {
     .map((e) => ({ ...e, p: Math.min(Math.max(e.percent, 2), 98) }))
     .sort((a, b) => a.p - b.p)
     .map((e) => {
-      let row = lastInRow.findIndex((last) => e.p - last >= SPINE_LABEL_GAP);
+      let row = lastInRow.findIndex((last) => e.p - last >= labelGap);
       if (row < 0) row = lastInRow.indexOf(Math.min(...lastInRow));
       lastInRow[row] = e.p;
       return { ...e, row };
@@ -238,7 +249,7 @@ function StorySpine({ spine }: { spine: any }) {
         </div>
       )}
       {placed.length > 0 && (
-        <div className="relative mx-6 mt-6 h-1 rounded bg-muted" style={{ marginBottom: 40 + maxRow * SPINE_ROW_STEP }}>
+        <div ref={trackRef} className="relative mx-6 mt-6 h-1 rounded bg-muted" style={{ marginBottom: 40 + maxRow * SPINE_ROW_STEP }}>
           {placed.map((e) => (
             <div key={e.key} className="absolute top-0" style={{ left: `${e.p}%` }}>
               <div className="absolute h-3 w-3 -translate-x-1/2 -translate-y-1 rounded-full border-2 bg-white" style={{ borderColor: TONE.linda }} />
