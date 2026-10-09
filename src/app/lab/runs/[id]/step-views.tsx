@@ -324,6 +324,53 @@ function CharacterGraph({
   // 선택된 인물의 관계를 마지막에 그려 위로 올린다
   const ordered = [...rels].sort((a, b) => Number(touches(a)) - Number(touches(b)));
 
+  // 곡선 기하 — 노드 반지름만큼 양끝을 줄이고, 법선 방향으로 휜다 (쌍방이면 더 휘어 서로 비켜 감)
+  const geo = ordered.map((r) => {
+    const a = pos.get(r.from)!, b = pos.get(r.to)!;
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const sx = a.x + (dx / len) * 30, sy = a.y + (dy / len) * 30;
+    const ex = b.x - (dx / len) * 34, ey = b.y - (dy / len) * 34;
+    const nx = -dy / len, ny = dx / len;
+    const bend = keys.has(`${r.to}→${r.from}`) ? 24 : 10;
+    const qx = (sx + ex) / 2 + nx * bend, qy = (sy + ey) / 2 + ny * bend;
+    // 곡선의 실제 중점(t=0.5)
+    return { r, sx, sy, ex, ey, qx, qy, nx, ny, midX: (sx + 2 * qx + ex) / 4, midY: (sy + 2 * qy + ey) / 4 };
+  });
+
+  // 감정 라벨 배치 — 곡선 중점에서 바깥(법선 방향)으로 밀어내며 다른 라벨·노드·인물 이름과 겹치지 않는 첫 자리를 고른다
+  type Box = { l: number; r: number; t: number; b: number };
+  const hit = (p: Box, q: Box) => p.l < q.r && q.l < p.r && p.t < q.b && q.t < p.b;
+  const taken: Box[] = chars.flatMap((c) => {
+    const p = pos.get(c.name)!;
+    const w = c.name.length * 13 + 6;
+    return [
+      { l: p.x - 26, r: p.x + 26, t: p.y - 26, b: p.y + 26 },
+      { l: p.x - w / 2, r: p.x + w / 2, t: p.y + 33, b: p.y + 50 },
+    ];
+  });
+  const labels = new Map<string, { x: number; y: number; anchor: 'start' | 'middle' | 'end'; text: string }>();
+  for (const g of geo) {
+    const text = touches(g.r) ? relationLabel(g.r).slice(0, 14) : '';
+    if (!text) continue;
+    const anchor = g.nx > 0.35 ? 'start' : g.nx < -0.35 ? 'end' : 'middle';
+    const w = text.length * 12 + 4, h = 16;
+    let spot: { x: number; y: number; box: Box } | null = null;
+    for (let k = 0; k < 12; k++) {
+      const d = 8 + k * 9;
+      const y = Math.min(Math.max(g.midY + g.ny * d, h), H - h);
+      const rawX = g.midX + g.nx * d;
+      // 캔버스 밖으로 나가지 않게 상자를 먼저 맞춘 뒤 글자 기준점을 되돌려 계산
+      const rawL = anchor === 'start' ? rawX : anchor === 'end' ? rawX - w : rawX - w / 2;
+      const l = Math.min(Math.max(rawL, 2), W - w - 2);
+      const x = anchor === 'start' ? l : anchor === 'end' ? l + w : l + w / 2;
+      spot = { x, y, box: { l, r: l + w, t: y - h / 2, b: y + h / 2 } };
+      if (!taken.some((t) => hit(t, spot!.box))) break;
+    }
+    taken.push(spot!.box);
+    labels.set(`${g.r.from}→${g.r.to}`, { x: spot!.x, y: spot!.y, anchor, text });
+  }
+
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full select-none" role="img" aria-label="인물 관계도">
       <defs>
@@ -337,24 +384,12 @@ function CharacterGraph({
       {/* 빈 곳을 누르면 선택 해제 */}
       <rect width={W} height={H} fill="transparent" onClick={() => selected && onToggle(selected)} />
 
-      {ordered.map((r) => {
-        const a = pos.get(r.from)!, b = pos.get(r.to)!;
+      {geo.map(({ r, sx, sy, ex, ey, qx, qy }) => {
         const col = colors.get(r.from)!;
         const active = touches(r);
         const dim = !!selected && !active;
         const turning = r.points.some((p) => p.turning);
-        // 노드 반지름만큼 양끝을 줄이고, 법선 방향으로 휘는 곡선 (쌍방이면 더 휘어 서로 비켜 감)
-        const dx = b.x - a.x, dy = b.y - a.y;
-        const len = Math.hypot(dx, dy) || 1;
-        const sx = a.x + (dx / len) * 30, sy = a.y + (dy / len) * 30;
-        const ex = b.x - (dx / len) * 34, ey = b.y - (dy / len) * 34;
-        const mx = (sx + ex) / 2, my = (sy + ey) / 2;
-        const nx = -dy / len, ny = dx / len;
-        const bend = keys.has(`${r.to}→${r.from}`) ? 24 : 10;
-        const qx = mx + nx * bend, qy = my + ny * bend;
-        // 곡선의 실제 중점(t=0.5)에서 바깥으로 살짝 띄운 곳에 감정 라벨
-        const px = (sx + 2 * qx + ex) / 4 + nx * 10, py = (sy + 2 * qy + ey) / 4 + ny * 10;
-        const label = active ? relationLabel(r) : '';
+        const label = labels.get(`${r.from}→${r.to}`);
         return (
           <g key={`${r.from}→${r.to}`} pointerEvents="none">
             <path
@@ -368,12 +403,12 @@ function CharacterGraph({
             />
             {label && (
               <text
-                x={px} y={py}
-                textAnchor="middle" dominantBaseline="middle"
+                x={label.x} y={label.y}
+                textAnchor={label.anchor} dominantBaseline="middle"
                 fontSize="12" fontWeight="600" fill={col}
                 stroke="white" strokeWidth="4" strokeLinejoin="round" paintOrder="stroke"
               >
-                {label.slice(0, 14)}
+                {label.text}
               </text>
             )}
           </g>
