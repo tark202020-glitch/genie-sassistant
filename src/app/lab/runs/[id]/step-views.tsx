@@ -188,7 +188,20 @@ const SPINE_LABELS: Record<string, string> = {
   midpoint: '미드포인트',
   low_point: '로우포인트',
   climax: '클라이맥스',
+  central_question: '중심 질문',
 };
+
+/** 모델이 메모에 스키마 키 이름(midpoint 등)을 그대로 쓴 경우 한국어 이름으로 바꿔 보여준다 */
+function koSpine(text: unknown): string {
+  return String(text ?? '').replace(
+    /\b(catalyst|turning_point_1|midpoint|low_point|climax|central_question)\b/g,
+    (k) => SPINE_LABELS[k] ?? k
+  );
+}
+
+/** 트랙 라벨 줄 배정 — 가까운 점끼리 라벨이 겹치지 않게 아래 줄로 엇갈려 놓는다 (최대 3줄) */
+const SPINE_LABEL_GAP = 14; // 라벨 폭(80px)이 트랙에서 차지하는 대략의 % 간격
+const SPINE_ROW_STEP = 26; // 줄 간격(px)
 
 function StorySpine({ spine }: { spine: any }) {
   if (!spine) return null;
@@ -196,7 +209,18 @@ function StorySpine({ spine }: { spine: any }) {
   const items = keys
     .map((k) => ({ key: k, ...(spine[k] ?? {}) }))
     .filter((e) => e && (e.loc || e.summary));
-  const placed = items.filter((e) => typeof e.percent === 'number' && e.percent > 0 && e.loc !== '부재');
+  const lastInRow = [-Infinity, -Infinity, -Infinity];
+  const placed = items
+    .filter((e) => typeof e.percent === 'number' && e.percent > 0 && e.loc !== '부재')
+    .map((e) => ({ ...e, p: Math.min(Math.max(e.percent, 2), 98) }))
+    .sort((a, b) => a.p - b.p)
+    .map((e) => {
+      let row = lastInRow.findIndex((last) => e.p - last >= SPINE_LABEL_GAP);
+      if (row < 0) row = lastInRow.indexOf(Math.min(...lastInRow));
+      lastInRow[row] = e.p;
+      return { ...e, row };
+    });
+  const maxRow = Math.max(0, ...placed.map((e) => e.row));
   return (
     <Section
       title="스토리 골격"
@@ -214,11 +238,18 @@ function StorySpine({ spine }: { spine: any }) {
         </div>
       )}
       {placed.length > 0 && (
-        <div className="relative mx-2 mb-10 mt-6 h-1 rounded bg-muted">
+        <div className="relative mx-6 mt-6 h-1 rounded bg-muted" style={{ marginBottom: 40 + maxRow * SPINE_ROW_STEP }}>
           {placed.map((e) => (
-            <div key={e.key} className="absolute -translate-x-1/2" style={{ left: `${Math.min(Math.max(e.percent, 2), 98)}%` }}>
-              <div className="mx-auto h-3 w-3 -translate-y-1 rounded-full border-2 bg-white" style={{ borderColor: TONE.linda }} />
-              <p className="mt-1 w-16 -translate-x-1/2 text-center text-[10px] leading-tight text-muted-foreground" style={{ marginLeft: '50%' }}>
+            <div key={e.key} className="absolute top-0" style={{ left: `${e.p}%` }}>
+              <div className="absolute h-3 w-3 -translate-x-1/2 -translate-y-1 rounded-full border-2 bg-white" style={{ borderColor: TONE.linda }} />
+              {/* 아래 줄로 내려간 라벨은 점과 가는 선으로 잇는다 */}
+              {e.row > 0 && (
+                <div className="absolute w-px -translate-x-1/2 bg-muted-foreground/30" style={{ top: 9, height: e.row * SPINE_ROW_STEP + 3 }} />
+              )}
+              <p
+                className="absolute w-20 -translate-x-1/2 text-center text-[10px] leading-tight text-muted-foreground"
+                style={{ top: 12 + e.row * SPINE_ROW_STEP }}
+              >
                 {SPINE_LABELS[e.key]}
                 <br />{e.percent}%
               </p>
@@ -238,7 +269,7 @@ function StorySpine({ spine }: { spine: any }) {
                 <span className="text-xs font-semibold text-muted-foreground">
                   {e.loc}{typeof e.percent === 'number' && e.percent > 0 ? ` · ${e.percent}%` : ''}
                 </span>
-                {e.summary && <p className="lab-serif">{e.summary}</p>}
+                {e.summary && <p className="lab-serif">{koSpine(e.summary)}</p>}
                 {e.key === 'low_point' && e.new_info_follows === false && (
                   <p className="text-xs" style={{ color: TONE.severe }}>뒤따르는 새 정보가 없습니다</p>
                 )}
@@ -246,7 +277,7 @@ function StorySpine({ spine }: { spine: any }) {
             </div>
           );
         })}
-        {spine.note && <p className="lab-serif mt-1 text-sm" style={{ color: TONE.linda }}>※ {spine.note}</p>}
+        {spine.note && <p className="lab-serif mt-1 text-sm" style={{ color: TONE.linda }}>※ {koSpine(spine.note)}</p>}
       </div>
     </Section>
   );
