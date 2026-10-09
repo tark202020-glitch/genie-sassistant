@@ -50,9 +50,9 @@ function itemLegend(items: Item[]): LegendItem[] {
     i.item_type === 'setting' && (s ? i.payload.status === s : !['충돌', '공백'].includes(i.payload.status));
   const all: [boolean, LegendItem][] = [
     [has((i) => i.item_type === 'strength'), { color: TONE.good, swatch: 'chip', label: '장점', desc: '살릴 것' }],
-    [has(isIssue('A')), { color: TONE.severe, swatch: 'chip', label: '결함 A급', desc: '가장 무거움' }],
-    [has(isIssue('B')), { color: TONE.warn, swatch: 'chip', label: '결함 B급', desc: '중간' }],
-    [has(isIssue(null)), { color: TONE.mild, swatch: 'chip', label: '결함 C급', desc: '가벼움' }],
+    [has(isIssue('A')), { color: TONE.severe, swatch: 'chip', label: '결함 A급', desc: '구조를 흔드는 것' }],
+    [has(isIssue('B')), { color: TONE.warn, swatch: 'chip', label: '결함 B급', desc: '장면 단위' }],
+    [has(isIssue(null)), { color: TONE.mild, swatch: 'chip', label: '결함 C급', desc: '문장 단위' }],
     [has((i) => i.item_type === 'line_edit'), { color: TONE.lineEdit, swatch: 'chip', label: '첨삭', desc: '원문과 나란히 놓은 문장 다듬기 제안' }],
     [has((i) => i.item_type === 'question'), { color: TONE.question, swatch: 'chip', label: '질문', desc: '작가에게 물을 것' }],
     [has(isSetting('충돌')), { color: TONE.severe, swatch: 'chip', label: '설정 충돌', desc: '같은 항목에 값이 둘 이상' }],
