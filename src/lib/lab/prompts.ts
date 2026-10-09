@@ -3,7 +3,7 @@
 
 import { LabRule } from './rules';
 
-export const PROMPTS_VERSION = 'prompts-2026-10-09.20 (선택지 값은 스키마 그대로·자유 기술은 한국어 — 글 종류별 규칙 코드 필터와 짝)';
+export const PROMPTS_VERSION = 'prompts-2026-10-09.21 (글 종류 적합 비중 측정·작가 지정)';
 
 /** 모든 단계 공통 제약 (설계문서 §12) */
 const COMMON = `당신은 소설 편집 보조 에이전트 '지작'이다. 반드시 지켜야 할 제약:
@@ -24,6 +24,18 @@ export interface StepPromptInput {
   mode?: string;
   prior: Record<string, unknown>; // 이전 단계 output 모음 (키: step)
   rules?: LabRule[];
+  /** 작가가 지정한 글 종류 — 있으면 단계 1이 그 기준으로 분석한다 (자동 판별이면 없음) */
+  textTypeChoice?: 'fiction' | 'essay' | null;
+}
+
+/** 글 종류 지정 블록 — 작가가 직접 고른 경우에만 단계 1에 삽입 */
+function textTypeChoiceBlock(choice?: 'fiction' | 'essay' | null): string {
+  if (!choice) return '';
+  const label = choice === 'fiction' ? '소설' : '에세이·실용서';
+  return `
+[작가 지정 — 글 종류]
+작가가 이 원고의 글 종류를 '${label}'로 지정했다. 구조화(장면/꼭지 분할, story_spine 작성 여부 포함)는 '${label}' 기준으로 수행한다.
+단 text_type의 type·fit·basis는 지정과 무관하게 원고만 보고 독립적으로 측정한다 — 자동 판별이 지정과 다르면 그대로 기록한다.`;
 }
 
 /** 작가 컨텍스트 블록 — 제공된 경우에만 프롬프트에 삽입 */
@@ -60,7 +72,7 @@ const R_LINE_EDIT_BLOCK = `
 - 전수 첨삭이 아니라 대표 사례 중심으로 최대 30건. 같은 유형이 반복되면 집중 구간(쪽 범위)을 comment에 명시하고 대표 사례만 수집한다.`;
 
 export function buildStepPrompt(step: string, input: StepPromptInput): string {
-  const { manuscript, synopsis, prior, rules, authorContext, mode } = input;
+  const { manuscript, synopsis, prior, rules, authorContext, mode, textTypeChoice } = input;
   const isRevision = mode === 'R';
 
   switch (step) {
@@ -81,12 +93,13 @@ ${manuscript}
 
     case '1': // 구조화
       return `${COMMON}
-
+${textTypeChoiceBlock(textTypeChoice)}
 [작업: 단계 1 — 구조화]
 가장 먼저 두 가지를 판별한다:
 ① text_type: 이 원고가 소설(fiction)인가, 에세이·실용서(essay)인가. 근거와 함께 기록한다 — 이후 모든 단계에서 적용 규칙·분석 축이 달라진다.
+   fit에는 소설·에세이·기타 각각에 얼마나 들어맞는지 적합 비중(%)을 합계 100으로 적는다. 기타는 대본·시·기사·논문처럼 둘 다 아닌 성격이며, 기타 비중이 있으면 무엇인지 other_label에 쓴다. 경계에 선 원고(예: 자기계발 메시지를 담은 1인칭 서사)는 한쪽으로 몰지 말고 비중을 나눠 적는다. type은 소설·에세이 중 비중이 큰 쪽이다.
 ② completeness: 결말(중심 질문의 해소)까지 있는 완성본인지, 일부(부 단위)인지. 근거(결말 존재 여부, 미해소 플롯)와 함께 기록한다 — 이후 단계의 복선·구조 판단이 잠정인지 확정인지가 여기에 달린다.
-**에세이·실용서로 판별되면**: scenes는 꼭지(장) 단위로 분할하고 summary에 그 꼭지의 메시지를 쓴다. devices에는 반복되는 핵심 메시지·키워드·인용 패턴을 기록한다. knowledge_states·emotion_arcs는 인물 서사가 있는 꼭지(저자 에피소드 등)에만 적용하고 없으면 빈 배열로 둔다. settings에는 수치·용어·제도(금리·세제 등) 서술을 모은다.
+**에세이·실용서로 판별(작가 지정이 있으면 지정 기준)되면**: scenes는 꼭지(장) 단위로 분할하고 summary에 그 꼭지의 메시지를 쓴다. devices에는 반복되는 핵심 메시지·키워드·인용 패턴을 기록한다. knowledge_states·emotion_arcs는 인물 서사가 있는 꼭지(저자 에피소드 등)에만 적용하고 없으면 빈 배열로 둔다. settings에는 수치·용어·제도(금리·세제 등) 서술을 모은다.
 원고를 다음으로 구조화한다:
 1. scenes: 장면 분할. 장면마다 id(s-01…), 범위(쪽), 등장 인물, 한 줄 요약
 2. characters: 주요 인물과 역할
@@ -94,14 +107,14 @@ ${manuscript}
 4. devices: 반복 장치(반복되는 사물·대사·행동)의 첫 등장과 재등장 위치
 5. settings: 설정 추출 — 원고에서 숫자·규칙·물건·직업 서술을 모은다. 지명·이동 경로·조직의 직급 체계·시간표(사건 경과)도 설정 항목이다. 같은 항목에 값이 둘 이상이면 status "충돌", 값이 없는데 플롯이 의존하면 "공백", 하나로 일관되면 "일관". 각 값마다 위치 기록
 6. knowledge_states: 주요 인물 3~5명에 대해 장면마다 "이 장면 끝에서 X가 아는 것(knows) / 믿는 것(believes) / 모르는 것(does_not_know)"을 원문 근거와 함께 기록. 이전 장면에서 변한 것(전이) 위주로 쓴다
-8. story_spine (소설일 때만, 에세이는 null): 스토리 골격 매핑 — 린다포인트. 다음 요소 각각의 위치를 쪽과 분량 비율(%)로 찾는다: catalyst(스토리를 시작시키는 사건), central_question(설정부가 던지는 중심 질문 한 문장), turning_point_1(1막→2막 전환, 통상 ~25% 부근), midpoint(2막을 반으로 가르는 사건), low_point(주인공이 바닥을 치는 지점 — 뒤따르는 새 정보가 있는지 함께), climax(중심 질문이 답해지는 지점). 요소가 없으면 loc을 "부재"로, 위치가 통상 비율에서 크게 벗어나면 note에 기록. 미완성 원고는 찾은 데까지만 적고 나머지는 "미도달"
+8. story_spine (소설일 때만 — 작가 지정이 있으면 지정 기준, 에세이는 null): 스토리 골격 매핑 — 린다포인트. 다음 요소 각각의 위치를 쪽과 분량 비율(%)로 찾는다: catalyst(스토리를 시작시키는 사건), central_question(설정부가 던지는 중심 질문 한 문장), turning_point_1(1막→2막 전환, 통상 ~25% 부근), midpoint(2막을 반으로 가르는 사건), low_point(주인공이 바닥을 치는 지점 — 뒤따르는 새 정보가 있는지 함께), climax(중심 질문이 답해지는 지점). 요소가 없으면 loc을 "부재"로, 위치가 통상 비율에서 크게 벗어나면 note에 기록. 미완성 원고는 찾은 데까지만 적고 나머지는 "미도달"
 7. emotion_arcs: 주요 인물별 감정 흐름 — 장면 순서대로 그 인물의 감정 상태를 추적한다. 각 지점마다 세 가지를 함께 기록한다: ① target — 그 감정이 누구(무엇)를 향하는가. 인물 간 관계의 흐름이 여기서 드러난다 ② intensity — 감정의 정도(약/중/강). 쌓이는지 식는지가 보여야 한다 ③ 전환점(is_turning_point — 예: 냉소→호감, 불신→신뢰)에는 반드시 전환을 일으킨 계기(trigger — 음식·행동·대사 같은 구체물)를 원문 근거와 함께. 계기가 원문에 없으면 trigger를 "계기 미서술"로 쓴다
 
 [원고]
 ${manuscript}
 
 [출력 JSON]
-{"text_type":{"type":"fiction|essay","basis":"판별 근거 한 줄"},
+{"text_type":{"type":"fiction|essay","fit":{"fiction":0,"essay":0,"other":0},"other_label":"기타 비중이 있으면 무엇인지 (예: 대본)","basis":"판별 근거 한 줄"},
 "completeness":{"is_complete":false,"scope":"예: 1부까지","basis":"결말 존재 여부·미해소 플롯 근거"},
 "scenes":[{"scene_id":"s-01","loc":"쪽 범위","characters":[],"summary":""}],
 "characters":[{"name":"","role":""}],

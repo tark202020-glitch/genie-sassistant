@@ -32,6 +32,7 @@ export default function NewRunPage() {
   const [manuscriptId, setManuscriptId] = useState('');
   const [mode, setMode] = useState<'I' | 'D' | 'R' | 'F'>('D');
   const [model, setModel] = useState<'gemini-2.5-flash' | 'gemini-2.5-pro'>('gemini-2.5-flash');
+  const [textType, setTextType] = useState<'auto' | 'fiction' | 'essay'>('auto');
   const [synopsis, setSynopsis] = useState('');
   const [error, setError] = useState('');
 
@@ -104,7 +105,7 @@ export default function NewRunPage() {
       const res = await fetch('/api/lab/runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ manuscript_id: manuscriptId, mode, model, synopsis: synopsis || null }),
+        body: JSON.stringify({ manuscript_id: manuscriptId, mode, model, text_type: textType, synopsis: synopsis || null }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -261,6 +262,25 @@ export default function NewRunPage() {
                 {m === 'gemini-2.5-flash' ? 'Flash — 빠름·저비용' : 'Pro — 깊은 분석·느림'}
               </Button>
             ))}
+          </div>
+          <div className="flex flex-wrap gap-2 items-center">
+            <span className="text-sm text-muted-foreground w-10">글 종류</span>
+            {(['auto', 'fiction', 'essay'] as const).map((t) => (
+              <Button
+                key={t}
+                variant={textType === t ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setTextType(t)}
+                disabled={running}
+              >
+                {{ auto: '자동 판별', fiction: '소설', essay: '에세이·실용서' }[t]}
+              </Button>
+            ))}
+            <span className="text-xs text-muted-foreground">
+              {textType === 'auto'
+                ? '에이전트가 원고를 읽고 판별합니다. 판별에 따라 소설 전용·에세이 전용 점검이 나뉩니다.'
+                : '지정한 종류로 분석합니다. 자동 판별 비중도 함께 측정해 기록합니다.'}
+            </span>
           </div>
           <Textarea
             placeholder="시놉시스 (선택 — 있으면 0.5단계 대조 실행)"

@@ -13,9 +13,13 @@ export async function GET() {
   const auth = await requireAdmin();
   if ('error' in auth) return auth.error;
 
+  // 글 종류는 단계 1 산출물에서 text_type만 뽑아 온다 (산출물 전체를 싣지 않음)
   const { data, error } = await supabase
     .from('lab_runs')
-    .select('id, mode, status, versions, metrics, created_at, finished_at, lab_manuscripts(title, part_label)')
+    .select(
+      'id, mode, status, versions, metrics, created_at, finished_at, lab_manuscripts(title, part_label), lab_run_steps(step, text_type:output->text_type)'
+    )
+    .eq('lab_run_steps.step', '1')
     .order('created_at', { ascending: false });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ runs: data });
@@ -25,9 +29,12 @@ export async function POST(req: NextRequest) {
   const auth = await requireAdmin();
   if ('error' in auth) return auth.error;
 
-  const { manuscript_id, mode, synopsis, model } = await req.json();
+  const { manuscript_id, mode, synopsis, model, text_type } = await req.json();
   if (!manuscript_id || !['I', 'D', 'R', 'F'].includes(mode)) {
     return NextResponse.json({ error: '원고와 모드(I/D/R/F)가 필요합니다.' }, { status: 400 });
+  }
+  if (text_type && !['auto', 'fiction', 'essay'].includes(text_type)) {
+    return NextResponse.json({ error: '글 종류는 auto·fiction·essay 중 하나여야 합니다.' }, { status: 400 });
   }
   if (model && !LAB_MODELS.includes(model)) {
     return NextResponse.json({ error: `지원하지 않는 모델입니다. (${LAB_MODELS.join(', ')})` }, { status: 400 });
@@ -47,6 +54,7 @@ export async function POST(req: NextRequest) {
     gold: 'gold-현재시점',
     model: model || DEFAULT_LAB_MODEL,
     author_context: ms?.author_context ? `있음(${ms.author_context.length}자)` : '없음',
+    text_type_choice: text_type || 'auto',
   };
 
   const { data: run, error } = await supabase

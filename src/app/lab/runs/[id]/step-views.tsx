@@ -5,6 +5,7 @@
 //             인물별 컬러 체계 공유, 색으로 뜻을 나누는 블록에는 반드시 범례를 단다
 import { useEffect, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
+import { TEXT_TYPE_COLOR, TEXT_TYPE_LABEL, fitPercents, type TextTypeInfo } from '@/lib/lab/text-type';
 
 // ── 의미색 — 판정 카드(page.tsx)·범례가 함께 쓰는 단일 출처 ──
 export const TONE = {
@@ -290,6 +291,61 @@ function StorySpine({ spine }: { spine: any }) {
         })}
         {spine.note && <p className="lab-serif mt-1 text-sm" style={{ color: TONE.linda }}>※ {koSpine(spine.note)}</p>}
       </div>
+    </Section>
+  );
+}
+
+// ── 글의 종류 — 분석에 적용된 종류 + 자동 측정한 적합 비중 ──
+function TextTypeBlock({ tt }: { tt: TextTypeInfo }) {
+  const pct = fitPercents(tt);
+  const author = tt.decided_by === 'author';
+  const kinds = ['fiction', 'essay', 'other'] as const;
+  return (
+    <Section
+      title="글의 종류"
+      sub="이 판별에 따라 소설 전용·에세이 전용 점검이 나뉩니다"
+      legend={
+        pct
+          ? kinds.map((k) => ({
+              color: TEXT_TYPE_COLOR[k],
+              swatch: 'fill' as const,
+              label: TEXT_TYPE_LABEL[k],
+              desc: k === 'other' ? '대본·시·기사처럼 둘 다 아닌 성격' : undefined,
+            }))
+          : undefined
+      }
+      note={pct ? '막대는 원고가 각 종류에 얼마나 들어맞는지 에이전트가 측정한 적합 비중입니다.' : undefined}
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-semibold text-muted-foreground">분석에 적용</span>
+        <Chip color={TEXT_TYPE_COLOR[tt.type ?? ''] ?? TONE.mild}>{TEXT_TYPE_LABEL[tt.type ?? ''] ?? tt.type}</Chip>
+        <span className="text-xs text-muted-foreground">{author ? '작가 지정' : '자동 판별'}</span>
+        {author && tt.detected && tt.detected !== tt.type && (
+          <span className="text-xs font-semibold" style={{ color: TONE.warn }}>
+            자동 판별은 {TEXT_TYPE_LABEL[tt.detected] ?? tt.detected} — 지정과 다릅니다
+          </span>
+        )}
+      </div>
+      {pct && (
+        <div className="mt-3">
+          <div className="flex h-3 w-full overflow-hidden rounded-full bg-muted">
+            {kinds
+              .filter((k) => pct[k] > 0)
+              .map((k) => (
+                <div key={k} style={{ width: `${pct[k]}%`, backgroundColor: TEXT_TYPE_COLOR[k] }} title={`${TEXT_TYPE_LABEL[k]} ${pct[k]}%`} />
+              ))}
+          </div>
+          <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-xs">
+            {kinds.map((k) => (
+              <span key={k}>
+                <b style={{ color: TEXT_TYPE_COLOR[k] }}>{TEXT_TYPE_LABEL[k]}</b> {pct[k]}%
+                {k === 'other' && pct.other > 0 && tt.other_label ? <span className="text-muted-foreground"> — {tt.other_label}</span> : null}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      {tt.basis && <p className="lab-serif mt-3 text-[14px] text-foreground/80">{tt.basis}</p>}
     </Section>
   );
 }
@@ -602,6 +658,8 @@ function Step1({ out }: { out: any }) {
 
   return (
     <div className="space-y-4">
+      {out.text_type?.type && <TextTypeBlock tt={out.text_type} />}
+
       {chars.length > 0 && (
         <Section
           title="인물 관계도"

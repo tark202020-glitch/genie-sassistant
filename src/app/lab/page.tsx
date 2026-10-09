@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { estimateCost } from '@/lib/lab/pricing';
+import { TEXT_TYPE_COLOR, TEXT_TYPE_LABEL, fitPercents, type TextTypeInfo } from '@/lib/lab/text-type';
 
 interface RunRow {
   id: string;
@@ -15,6 +16,29 @@ interface RunRow {
   metrics: { tokens?: { prompt: number; output: number; total: number } } | null;
   created_at: string;
   lab_manuscripts: { title: string; part_label: string | null } | null;
+  /** 단계 1의 text_type만 (API가 step=1로 걸러 줌) */
+  lab_run_steps?: { step: string; text_type: TextTypeInfo | null }[];
+}
+
+/** 글 종류 칸 — 적용 종류 + 결정 방식(자동이면 적합 비중) */
+function TextTypeCell({ run }: { run: RunRow }) {
+  const tt = run.lab_run_steps?.[0]?.text_type;
+  const choice = run.versions?.text_type_choice;
+  // 단계 1 전이면 작가 지정값만 보인다
+  const type = tt?.type ?? (choice === 'fiction' || choice === 'essay' ? choice : null);
+  if (!type) return <span className="text-muted-foreground">—</span>;
+  const author = tt ? tt.decided_by === 'author' : true;
+  const pct = fitPercents(tt);
+  return (
+    <>
+      <span className="font-semibold" style={{ color: TEXT_TYPE_COLOR[type] }}>{TEXT_TYPE_LABEL[type] ?? type}</span>
+      <span className="block text-[11px] text-muted-foreground">
+        {author
+          ? `지정${tt?.detected && tt.detected !== type ? ` · 자동은 ${TEXT_TYPE_LABEL[tt.detected] ?? tt.detected}` : ''}${!tt ? ' · 분석 전' : ''}`
+          : `자동${pct ? ` ${pct[type as 'fiction' | 'essay']}%` : ''}`}
+      </span>
+    </>
+  );
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -63,6 +87,7 @@ export default function LabHome() {
                 <tr className="text-left text-muted-foreground border-b">
                   <th className="py-2">일시</th>
                   <th>원고</th>
+                  <th>글 종류</th>
                   <th>모드</th>
                   <th>상태</th>
                   <th>모델</th>
@@ -78,6 +103,9 @@ export default function LabHome() {
                     <td>
                       {r.lab_manuscripts?.title}
                       {r.lab_manuscripts?.part_label ? ` (${r.lab_manuscripts.part_label})` : ''}
+                    </td>
+                    <td className="text-xs whitespace-nowrap">
+                      <TextTypeCell run={r} />
                     </td>
                     <td>{r.mode}</td>
                     <td>
