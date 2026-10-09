@@ -1,14 +1,30 @@
 'use client';
 
 // 단계별 읽기 뷰 — 판정 항목(lab_items)이 커버하지 않는 산출물을 사람이 읽을 수 있게 렌더링
-// 디자인 원칙: 다크 고정(/lab 레이아웃), 인물별 컬러 체계 공유, 표보다 카드·다이어그램
+// 디자인 원칙: 라이트 고정(/lab 레이아웃), 에이전트가 쓴 글은 KoPub 바탕(lab.css),
+//             인물별 컬러 체계 공유, 색으로 뜻을 나누는 블록에는 반드시 범례를 단다
+import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
+
+// ── 의미색 — 판정 카드(page.tsx)·범례가 함께 쓰는 단일 출처 ──
+export const TONE = {
+  good: '#059669', // 장점 · 일관 · 안다 · 빛나는 순간
+  severe: '#dc2626', // A급 · 충돌 · 부재
+  warn: '#d97706', // B급 · 공백 · 흔들리는 지점 · 고를 것
+  mild: '#64748b', // C급 · 참고 · 모른다
+  lineEdit: '#7c3aed', // 첨삭
+  question: '#0891b2', // 질문
+  belief: '#2563eb', // 믿는다 · 확인
+  linda: '#b45309', // 린다포인트
+  neutral: '#78716c', // 색이 아니라 모양으로 구분하는 범례용
+};
 
 /** 린다포인트 표식 — 『시나리오 거듭나기』 유래 산출물 구분 (원칙 문서 §3) */
 export function LindaMark() {
   return (
     <span
-      className="inline-flex items-center rounded-sm border border-amber-400/50 bg-amber-400/10 px-1 py-px align-middle text-[9px] font-bold tracking-wider text-amber-300"
+      className="inline-flex items-center rounded-sm px-1 py-px align-middle text-[10px] font-bold tracking-wider"
+      style={{ color: TONE.linda, backgroundColor: `${TONE.linda}14`, border: `1px solid ${TONE.linda}55` }}
       title="린다포인트 — 『시나리오 거듭나기』(린다 시거) 원칙에서 유래한 점검"
     >
       린다
@@ -16,8 +32,87 @@ export function LindaMark() {
   );
 }
 
+/** 의미색 칩 — 면 틴트 + 같은 색 글자 */
+export function Chip({ color, children, className = '' }: { color: string; children: React.ReactNode; className?: string }) {
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center rounded-full px-2 py-px text-[11px] font-semibold ${className}`}
+      style={{ backgroundColor: `${color}14`, color, border: `1px solid ${color}45` }}
+    >
+      {children}
+    </span>
+  );
+}
+
+/** 긴 글 — 빈 줄은 단락, 줄바꿈은 문단(첫 줄 들여쓰기). 서체·행간은 lab.css */
+export function Prose({ text, className = '' }: { text?: unknown; className?: string }) {
+  if (!text) return null;
+  const blocks = String(text).trim().split(/\n\s*\n/);
+  return (
+    <div className={`lab-prose ${className}`}>
+      {blocks.map((b, i) => (
+        <div key={i} className="lab-block">
+          {b
+            .split('\n')
+            .map((line) => line.trim())
+            .filter(Boolean)
+            .map((line, j) => (
+              <p key={j}>{line}</p>
+            ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── 범례 ──
+type Swatch = 'dot' | 'line' | 'dash' | 'chip' | 'outline' | 'fill';
+export interface LegendItem {
+  color: string;
+  label: string;
+  desc?: string;
+  swatch?: Swatch;
+}
+
+function SwatchIcon({ color, swatch }: { color: string; swatch: Swatch }) {
+  if (swatch === 'line' || swatch === 'dash') {
+    return (
+      <svg width="22" height="8" aria-hidden className="shrink-0">
+        <line
+          x1="1" y1="4" x2="21" y2="4"
+          stroke={color}
+          strokeWidth={swatch === 'line' ? 2 : 1.4}
+          strokeDasharray={swatch === 'dash' ? '4 3' : undefined}
+        />
+      </svg>
+    );
+  }
+  if (swatch === 'chip') return <span className="inline-block h-3 w-5 shrink-0 rounded" style={{ backgroundColor: `${color}1f`, border: `1px solid ${color}66` }} />;
+  if (swatch === 'fill') return <span className="inline-block h-3 w-5 shrink-0 rounded" style={{ backgroundColor: `${color}55`, border: `1px solid ${color}` }} />;
+  if (swatch === 'outline') return <span className="inline-block h-3 w-5 shrink-0 rounded" style={{ border: `1px dashed ${color}` }} />;
+  return <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />;
+}
+
+/** 색 범례 — 블록 안에서 색·모양이 무엇을 뜻하는지(왜 다르게 칠했는지) 밝힌다 */
+export function Legend({ items, note }: { items: LegendItem[]; note?: string }) {
+  if (!items.length && !note) return null;
+  return (
+    <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-lg border border-dashed px-3 py-2 text-xs">
+      <span className="font-semibold text-muted-foreground">범례</span>
+      {items.map((it, i) => (
+        <span key={i} className="inline-flex items-center gap-1.5">
+          <SwatchIcon color={it.color} swatch={it.swatch ?? 'dot'} />
+          <span className="font-semibold text-foreground/85">{it.label}</span>
+          {it.desc && <span className="text-muted-foreground">{it.desc}</span>}
+        </span>
+      ))}
+      {note && <span className="basis-full leading-relaxed text-muted-foreground">{note}</span>}
+    </div>
+  );
+}
+
 // ── 인물별 컬러 체계 (모든 뷰가 공유: 관계도·장면 카드·감정 흐름·지식 표) ──
-const CHAR_COLORS = ['#60a5fa', '#f472b6', '#34d399', '#fbbf24', '#a78bfa', '#f87171', '#22d3ee', '#fb923c', '#a3e635', '#e879f9'];
+const CHAR_COLORS = ['#2563eb', '#db2777', '#059669', '#d97706', '#7c3aed', '#dc2626', '#0891b2', '#ea580c', '#65a30d', '#c026d3'];
 
 function charColorMap(characters: { name: string }[]): Map<string, string> {
   const m = new Map<string, string>();
@@ -32,15 +127,23 @@ function matchCharacter(text: string | undefined, names: string[]): string | nul
   return null;
 }
 
+/** 블록 안의 보조 카드 */
+const CARD = 'rounded-lg border bg-background/70 p-3';
+
+/** 필드 이름 — 본문(바탕)과 구분되는 고딕 소제목 */
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return <p className="mb-1 text-xs font-semibold text-muted-foreground">{children}</p>;
+}
+
 export function EvidenceList({ evidence }: { evidence: any[] }) {
   if (!evidence?.length) return null;
   return (
-    <ul className="mt-1.5 space-y-1">
+    <ul className="mt-2 space-y-1">
       {evidence.map((e, i) => (
-        <li key={i} className="text-xs text-muted-foreground border-l-2 border-primary/40 pl-2 leading-relaxed">
-          <span className="font-medium text-foreground/70">{e.loc}</span> “{e.quote}”
+        <li key={i} className="lab-serif border-l-2 border-foreground/15 pl-2.5 text-[13px] text-foreground/70">
+          <span className="mr-1 font-sans text-[11px] font-semibold text-muted-foreground">{e.loc}</span>“{e.quote}”
           {e._evidence_valid === false && (
-            <Badge variant="destructive" className="ml-1 text-[10px]">인용 검증 실패</Badge>
+            <Badge variant="destructive" className="ml-1 font-sans text-[10px]">인용 검증 실패</Badge>
           )}
         </li>
       ))}
@@ -48,16 +151,31 @@ export function EvidenceList({ evidence }: { evidence: any[] }) {
   );
 }
 
-function Section({ title, sub, linda, children }: { title: string; sub?: string; linda?: boolean; children: React.ReactNode }) {
+function Section({
+  title,
+  sub,
+  linda,
+  legend,
+  note,
+  children,
+}: {
+  title: string;
+  sub?: string;
+  linda?: boolean;
+  legend?: LegendItem[];
+  note?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <section className="rounded-xl border bg-card/60 p-4">
-      <div className="mb-3 flex items-baseline gap-2">
-        <h3 className="text-sm font-bold tracking-wide">
+    <section className="rounded-xl border bg-white p-5">
+      <div className="mb-3 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <h3 className="text-[15px] font-bold tracking-wide">
           {title}
           {linda && <span className="ml-1.5"><LindaMark /></span>}
         </h3>
         {sub && <span className="text-xs text-muted-foreground">{sub}</span>}
       </div>
+      {(legend?.length || note) && <Legend items={legend ?? []} note={note} />}
       {children}
     </section>
   );
@@ -80,19 +198,27 @@ function StorySpine({ spine }: { spine: any }) {
     .filter((e) => e && (e.loc || e.summary));
   const placed = items.filter((e) => typeof e.percent === 'number' && e.percent > 0 && e.loc !== '부재');
   return (
-    <Section title="스토리 골격" sub="카타리스트 → 전환점 → 미드포인트 → 로우포인트 → 클라이맥스 (위치 = 분량 비율)" linda>
+    <Section
+      title="스토리 골격"
+      sub="점의 위치는 원고 전체 분량 중 몇 % 지점인지를 뜻합니다"
+      linda
+      legend={[
+        { color: TONE.linda, label: '골격 요소', desc: '린다포인트 점검으로 찾은 위치' },
+        { color: TONE.severe, label: '부재 · 미도달', desc: '찾지 못했거나 원고가 아직 닿지 않은 요소' },
+      ]}
+    >
       {spine.central_question && (
-        <p className="mb-3 rounded-lg border border-amber-400/30 bg-amber-400/5 px-3 py-2 text-sm">
-          <span className="mr-1.5 text-[11px] font-bold text-amber-300">중심 질문</span>
-          {spine.central_question}
-        </p>
+        <div className="mb-3 rounded-lg px-3 py-2" style={{ backgroundColor: `${TONE.linda}0d`, border: `1px solid ${TONE.linda}40` }}>
+          <p className="text-[11px] font-bold" style={{ color: TONE.linda }}>중심 질문</p>
+          <p className="lab-serif text-[15px]">{spine.central_question}</p>
+        </div>
       )}
       {placed.length > 0 && (
         <div className="relative mx-2 mb-10 mt-6 h-1 rounded bg-muted">
           {placed.map((e) => (
             <div key={e.key} className="absolute -translate-x-1/2" style={{ left: `${Math.min(Math.max(e.percent, 2), 98)}%` }}>
-              <div className="mx-auto h-3 w-3 -translate-y-1 rounded-full border-2 border-amber-400 bg-background" />
-              <p className="mt-1 w-16 -translate-x-1/2 text-center text-[9px] leading-tight text-muted-foreground" style={{ marginLeft: '50%' }}>
+              <div className="mx-auto h-3 w-3 -translate-y-1 rounded-full border-2 bg-white" style={{ borderColor: TONE.linda }} />
+              <p className="mt-1 w-16 -translate-x-1/2 text-center text-[10px] leading-tight text-muted-foreground" style={{ marginLeft: '50%' }}>
                 {SPINE_LABELS[e.key]}
                 <br />{e.percent}%
               </p>
@@ -100,42 +226,48 @@ function StorySpine({ spine }: { spine: any }) {
           ))}
         </div>
       )}
-      <div className="space-y-1.5 text-xs">
-        {items.map((e) => (
-          <div key={e.key} className="flex gap-2">
-            <span className={`w-20 shrink-0 font-semibold ${e.loc === '부재' || e.loc === '미도달' ? 'text-red-300' : 'text-amber-300/90'}`}>
-              {SPINE_LABELS[e.key]}
-            </span>
-            <span className="text-muted-foreground">
-              <span className="text-foreground/70">{e.loc}{typeof e.percent === 'number' && e.percent > 0 ? ` (${e.percent}%)` : ''}</span>
-              {e.summary ? ` — ${e.summary}` : ''}
-              {e.key === 'low_point' && e.new_info_follows === false && (
-                <span className="ml-1 text-red-300">· 뒤따르는 새 정보 없음</span>
-              )}
-            </span>
-          </div>
-        ))}
-        {spine.note && <p className="mt-1 text-amber-200/80">※ {spine.note}</p>}
+      <div className="space-y-2">
+        {items.map((e) => {
+          const missing = e.loc === '부재' || e.loc === '미도달';
+          return (
+            <div key={e.key} className="flex gap-3">
+              <span className="w-20 shrink-0 pt-0.5 text-xs font-semibold" style={{ color: missing ? TONE.severe : TONE.linda }}>
+                {SPINE_LABELS[e.key]}
+              </span>
+              <div className="text-sm">
+                <span className="text-xs font-semibold text-muted-foreground">
+                  {e.loc}{typeof e.percent === 'number' && e.percent > 0 ? ` · ${e.percent}%` : ''}
+                </span>
+                {e.summary && <p className="lab-serif">{e.summary}</p>}
+                {e.key === 'low_point' && e.new_info_follows === false && (
+                  <p className="text-xs" style={{ color: TONE.severe }}>뒤따르는 새 정보가 없습니다</p>
+                )}
+              </div>
+            </div>
+          );
+        })}
+        {spine.note && <p className="lab-serif mt-1 text-sm" style={{ color: TONE.linda }}>※ {spine.note}</p>}
       </div>
     </Section>
   );
 }
 
-function statusColor(status?: string) {
-  if (status === '충돌') return { badge: 'bg-red-500/15 text-red-300 border-red-500/40' };
-  if (status === '공백') return { badge: 'bg-amber-500/15 text-amber-300 border-amber-500/40' };
-  return { badge: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40' };
+function settingTone(status?: string): string {
+  if (status === '충돌') return TONE.severe;
+  if (status === '공백') return TONE.warn;
+  return TONE.good;
 }
 
-// ── 인물 관계도 — 노드(아이콘) + 감정 흐름(emotion_arcs의 대상)을 선으로 연결 ──
-function CharacterGraph({ characters, arcs }: { characters: any[]; arcs: any[] }) {
-  const chars = (characters ?? []).slice(0, 10);
-  if (chars.length === 0) return null;
-  const colors = charColorMap(chars);
-  const names = chars.map((c) => c.name);
+// ── 인물 관계도 — 그림(노드·화살표) + 인물 명단(색 범례) + 관계 목록 ──
+interface Relation {
+  from: string;
+  to: string;
+  points: { emotion: string; turning: boolean }[];
+}
 
-  // 간선: A의 감정이 B(다른 인물)를 향하면 A→B. 전환점 감정을 우선 보관
-  const edges = new Map<string, { from: string; to: string; emotion: string; turning: boolean }>();
+/** emotion_arcs의 대상(target)으로 인물 간 관계를 모은다. A의 감정이 B를 향하면 A→B */
+function buildRelations(arcs: any[], names: string[]): Relation[] {
+  const rels = new Map<string, Relation>();
   for (const arc of arcs ?? []) {
     const from = matchCharacter(arc.character, names);
     if (!from) continue;
@@ -143,60 +275,105 @@ function CharacterGraph({ characters, arcs }: { characters: any[]; arcs: any[] }
       const to = matchCharacter(p.target, names);
       if (!to || to === from) continue;
       const key = `${from}→${to}`;
-      const prev = edges.get(key);
-      if (!prev || (p.is_turning_point && !prev.turning) || !prev.emotion) {
-        edges.set(key, { from, to, emotion: p.emotion ?? '', turning: !!p.is_turning_point });
-      }
+      if (!rels.has(key)) rels.set(key, { from, to, points: [] });
+      rels.get(key)!.points.push({ emotion: p.emotion ?? '', turning: !!p.is_turning_point });
     }
   }
+  return [...rels.values()];
+}
 
+/** 관계의 대표 감정 — 마지막 전환점, 없으면 마지막 감정 */
+function relationLabel(r: Relation): string {
+  const rev = [...r.points].reverse();
+  return (rev.find((p) => p.turning && p.emotion) ?? rev.find((p) => p.emotion))?.emotion ?? '';
+}
+
+function CharacterGraph({
+  chars,
+  colors,
+  rels,
+  selected,
+  onToggle,
+}: {
+  chars: any[];
+  colors: Map<string, string>;
+  rels: Relation[];
+  selected: string | null;
+  onToggle: (name: string) => void;
+}) {
   const W = 720;
   const H = chars.length <= 4 ? 320 : chars.length <= 7 ? 400 : 470;
-  const cx = W / 2, cy = H / 2 - 10;
-  const rx = W / 2 - 110, ry = H / 2 - 64;
+  const cx = W / 2, cy = H / 2 - 8;
+  const rx = W / 2 - 90, ry = H / 2 - 56;
   const pos = new Map<string, { x: number; y: number }>();
   chars.forEach((c, i) => {
     const a = (Math.PI * 2 * i) / chars.length - Math.PI / 2;
     pos.set(c.name, { x: cx + rx * Math.cos(a), y: cy + ry * Math.sin(a) });
   });
 
+  const keys = new Set(rels.map((r) => `${r.from}→${r.to}`));
+  const touches = (r: Relation) => !!selected && (r.from === selected || r.to === selected);
+  const connected = new Set<string>();
+  if (selected) {
+    connected.add(selected);
+    rels.forEach((r) => {
+      if (r.from === selected) connected.add(r.to);
+      if (r.to === selected) connected.add(r.from);
+    });
+  }
+  // 선택된 인물의 관계를 마지막에 그려 위로 올린다
+  const ordered = [...rels].sort((a, b) => Number(touches(a)) - Number(touches(b)));
+
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="인물 관계도">
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full select-none" role="img" aria-label="인물 관계도">
       <defs>
         {[...colors.entries()].map(([n, col]) => (
           <marker key={n} id={`arrow-${n.replace(/\W/g, '')}`} viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto">
-            <path d="M0,0 L8,4 L0,8 z" fill={col} opacity="0.85" />
+            <path d="M0,0 L8,4 L0,8 z" fill={col} />
           </marker>
         ))}
       </defs>
 
-      {[...edges.values()].map((e, i) => {
-        const a = pos.get(e.from)!, b = pos.get(e.to)!;
-        const col = colors.get(e.from)!;
-        // 노드 반지름만큼 양끝을 줄이고, 중심 반대쪽으로 살짝 휘는 곡선
+      {/* 빈 곳을 누르면 선택 해제 */}
+      <rect width={W} height={H} fill="transparent" onClick={() => selected && onToggle(selected)} />
+
+      {ordered.map((r) => {
+        const a = pos.get(r.from)!, b = pos.get(r.to)!;
+        const col = colors.get(r.from)!;
+        const active = touches(r);
+        const dim = !!selected && !active;
+        const turning = r.points.some((p) => p.turning);
+        // 노드 반지름만큼 양끝을 줄이고, 법선 방향으로 휘는 곡선 (쌍방이면 더 휘어 서로 비켜 감)
         const dx = b.x - a.x, dy = b.y - a.y;
         const len = Math.hypot(dx, dy) || 1;
         const sx = a.x + (dx / len) * 30, sy = a.y + (dy / len) * 30;
         const ex = b.x - (dx / len) * 34, ey = b.y - (dy / len) * 34;
         const mx = (sx + ex) / 2, my = (sy + ey) / 2;
-        const nx = -dy / len, ny = dx / len; // 법선
-        const bend = edges.has(`${e.to}→${e.from}`) ? 22 : 10; // 쌍방이면 더 휘어 겹침 방지
+        const nx = -dy / len, ny = dx / len;
+        const bend = keys.has(`${r.to}→${r.from}`) ? 24 : 10;
         const qx = mx + nx * bend, qy = my + ny * bend;
-        const lx = mx + nx * (bend + 10), ly = my + ny * (bend + 10);
+        // 곡선의 실제 중점(t=0.5)에서 바깥으로 살짝 띄운 곳에 감정 라벨
+        const px = (sx + 2 * qx + ex) / 4 + nx * 10, py = (sy + 2 * qy + ey) / 4 + ny * 10;
+        const label = active ? relationLabel(r) : '';
         return (
-          <g key={i}>
+          <g key={`${r.from}→${r.to}`} pointerEvents="none">
             <path
               d={`M${sx},${sy} Q${qx},${qy} ${ex},${ey}`}
               fill="none"
               stroke={col}
-              strokeWidth={e.turning ? 2 : 1.2}
-              strokeDasharray={e.turning ? undefined : '4 3'}
-              opacity="0.7"
-              markerEnd={`url(#arrow-${e.from.replace(/\W/g, '')})`}
+              strokeWidth={turning ? (active ? 2.6 : 2) : active ? 1.8 : 1.2}
+              strokeDasharray={turning ? undefined : '5 4'}
+              opacity={dim ? 0.08 : active ? 0.95 : 0.5}
+              markerEnd={`url(#arrow-${r.from.replace(/\W/g, '')})`}
             />
-            {e.emotion && (
-              <text x={lx} y={ly} textAnchor="middle" fontSize="10" fill={col} opacity="0.95">
-                {e.emotion.slice(0, 12)}
+            {label && (
+              <text
+                x={px} y={py}
+                textAnchor="middle" dominantBaseline="middle"
+                fontSize="12" fontWeight="600" fill={col}
+                stroke="white" strokeWidth="4" strokeLinejoin="round" paintOrder="stroke"
+              >
+                {label.slice(0, 14)}
               </text>
             )}
           </g>
@@ -206,21 +383,23 @@ function CharacterGraph({ characters, arcs }: { characters: any[]; arcs: any[] }
       {chars.map((c) => {
         const p = pos.get(c.name)!;
         const col = colors.get(c.name)!;
+        const on = selected === c.name;
+        const faded = !!selected && !connected.has(c.name);
         return (
-          <g key={c.name}>
-            <circle cx={p.x} cy={p.y} r="24" fill={col} opacity="0.16" />
-            <circle cx={p.x} cy={p.y} r="24" fill="none" stroke={col} strokeWidth="1.5" />
+          <g key={c.name} className="cursor-pointer" opacity={faded ? 0.3 : 1} onClick={() => onToggle(c.name)}>
+            <title>{c.role ? `${c.name} — ${c.role}` : c.name}</title>
+            <circle cx={p.x} cy={p.y} r="24" fill={col} fillOpacity="0.12" />
+            <circle cx={p.x} cy={p.y} r="24" fill="none" stroke={col} strokeWidth={on ? 3 : 1.5} />
             {/* 사람 아이콘 */}
             <circle cx={p.x} cy={p.y - 6} r="6" fill={col} />
             <path d={`M${p.x - 10},${p.y + 13} a10 10 0 0 1 20 0 z`} fill={col} />
-            <text x={p.x} y={p.y + 42} textAnchor="middle" fontSize="13" fontWeight="700" fill="currentColor">
+            <text
+              x={p.x} y={p.y + 43}
+              textAnchor="middle" fontSize="13" fontWeight="700" fill="currentColor"
+              stroke="white" strokeWidth="4" strokeLinejoin="round" paintOrder="stroke"
+            >
               {c.name}
             </text>
-            {c.role && (
-              <text x={p.x} y={p.y + 57} textAnchor="middle" fontSize="10" fill="currentColor" opacity="0.55">
-                {String(c.role).slice(0, 22)}
-              </text>
-            )}
           </g>
         );
       })}
@@ -228,20 +407,99 @@ function CharacterGraph({ characters, arcs }: { characters: any[]; arcs: any[] }
   );
 }
 
+function CharacterMap({ characters, arcs }: { characters: any[]; arcs: any[] }) {
+  const [selected, setSelected] = useState<string | null>(null);
+  const chars = (characters ?? []).slice(0, 10);
+  const colors = charColorMap(chars);
+  const names = chars.map((c) => c.name);
+  const rels = buildRelations(arcs, names);
+  const toggle = (n: string) => setSelected((cur) => (cur === n ? null : n));
+
+  // 관계 목록 — 선택이 있으면 그 인물이 주고받는 관계만, 출발 인물별로 묶는다
+  const shown = selected ? rels.filter((r) => r.from === selected || r.to === selected) : rels;
+  const groups = names
+    .map((n) => ({ from: n, rels: shown.filter((r) => r.from === n) }))
+    .filter((g) => g.rels.length > 0);
+
+  return (
+    <div className="space-y-5">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_240px]">
+        <CharacterGraph chars={chars} colors={colors} rels={rels} selected={selected} onToggle={toggle} />
+        <ul className="space-y-0.5 self-start">
+          {chars.map((c) => {
+            const col = colors.get(c.name)!;
+            const on = selected === c.name;
+            return (
+              <li key={c.name}>
+                <button
+                  type="button"
+                  onClick={() => toggle(c.name)}
+                  className={`w-full rounded-lg px-2.5 py-1.5 text-left transition-colors ${on ? 'bg-muted' : 'hover:bg-muted/50'}`}
+                >
+                  <span className="flex items-center gap-1.5 text-sm font-semibold">
+                    <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: col }} />
+                    {c.name}
+                  </span>
+                  {c.role && <span className="lab-serif mt-0.5 block text-[12.5px] text-muted-foreground">{c.role}</span>}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+
+      {groups.length > 0 && (
+        <div className="border-t pt-4">
+          <p className="mb-2.5 text-xs font-semibold text-muted-foreground">
+            {selected ? `${selected} — 주고받는 관계 (다시 누르면 전체 보기)` : '관계 목록 — 감정의 흐름은 › 로 잇고, 굵은 글씨가 전환점'}
+          </p>
+          <div className="grid gap-x-8 gap-y-4 sm:grid-cols-2">
+            {groups.map((g) => (
+              <div key={g.from}>
+                <p className="mb-1 flex items-center gap-1.5 text-sm font-semibold">
+                  <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: colors.get(g.from) }} />
+                  {g.from}
+                </p>
+                <ul className="space-y-1 pl-4">
+                  {g.rels.map((r) => (
+                    <li key={r.to} className="text-[13px] leading-relaxed">
+                      <span className="text-muted-foreground">→ </span>
+                      <span className="font-semibold" style={{ color: colors.get(r.to) }}>{r.to}</span>
+                      <span className="mx-1.5 text-muted-foreground">·</span>
+                      {r.points.map((p, i) => (
+                        <span key={i} className={p.turning ? 'font-bold text-foreground' : 'text-foreground/70'}>
+                          {i > 0 && <span className="mx-1 font-normal text-muted-foreground/60">›</span>}
+                          {p.emotion}
+                        </span>
+                      ))}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── 단계 0.5: 시놉시스 대조 ──────────────────────────────
 function Step05({ out }: { out: any }) {
   const list = out.divergences ?? [];
   return (
-    <Section title={`시놉시스와 갈라진 지점`} sub={`${list.length}건 — 갈라짐은 결함이 아니라 확인 대상`}>
+    <Section title="시놉시스와 갈라진 지점" sub={`${list.length}건 — 갈라짐은 결함이 아니라 확인 대상`}>
       {list.length === 0 ? (
         <p className="text-sm text-muted-foreground">갈라진 지점이 없습니다.</p>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           {list.map((d: any, i: number) => (
-            <div key={i} className="rounded-lg border bg-background/60 p-3 text-sm">
-              <p className="font-semibold">{d.item}</p>
-              <p className="mt-1 text-xs"><span className="text-muted-foreground">시놉시스</span> {d.synopsis_state}</p>
-              <p className="text-xs"><span className="text-muted-foreground">원고</span> {d.manuscript_state}</p>
+            <div key={i} className={CARD}>
+              <p className="text-sm font-semibold">{d.item}</p>
+              <div className="mt-1.5 space-y-1 text-sm">
+                <div><FieldLabel>시놉시스</FieldLabel><p className="lab-serif">{d.synopsis_state}</p></div>
+                <div><FieldLabel>원고</FieldLabel><p className="lab-serif">{d.manuscript_state}</p></div>
+              </div>
               <EvidenceList evidence={d.evidence} />
             </div>
           ))}
@@ -258,48 +516,57 @@ function Step1({ out }: { out: any }) {
   const names = chars.map((c: any) => c.name);
   const sceneColor = (s: any) => {
     const n = matchCharacter((s.characters ?? [])[0], names) ?? (s.characters ?? [])[0];
-    return colors.get(n) ?? '#64748b';
+    return colors.get(n) ?? TONE.mild;
   };
+  const charLegend: LegendItem[] = chars.slice(0, 10).map((c: any) => ({ color: colors.get(c.name)!, label: c.name }));
 
   return (
     <div className="space-y-4">
       {chars.length > 0 && (
-        <Section title="인물 관계도" sub="선 = 감정이 향하는 방향 (실선 = 전환점을 지난 관계)">
-          <CharacterGraph characters={chars} arcs={out.emotion_arcs ?? []} />
+        <Section
+          title="인물 관계도"
+          sub="화살표는 감정이 향하는 방향입니다"
+          legend={[
+            { color: TONE.neutral, swatch: 'line', label: '실선', desc: '전환점을 지난 관계' },
+            { color: TONE.neutral, swatch: 'dash', label: '점선', desc: '아직 전환점이 없는 관계' },
+          ]}
+          note="선의 색은 감정을 보내는 인물의 색이고, 인물 색의 범례는 오른쪽 명단입니다. 그림이나 명단에서 인물을 누르면 그 인물이 주고받는 관계만 남고 감정이 함께 표시됩니다."
+        >
+          <CharacterMap characters={chars} arcs={out.emotion_arcs ?? []} />
         </Section>
       )}
 
       {out.story_spine && <StorySpine spine={out.story_spine} />}
 
       {out.scenes?.length > 0 && (
-        <Section title={`장면 ${out.scenes.length}개`} sub="카드 색 = 첫 등장 인물">
+        <Section
+          title={`장면 ${out.scenes.length}개`}
+          legend={charLegend}
+          note="카드 색은 그 장면에 가장 먼저 등장하는 인물의 색입니다."
+        >
           <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
             {out.scenes.map((s: any, i: number) => {
               const col = sceneColor(s);
               return (
-              <div
-                key={i}
-                className="rounded-lg p-3"
-                style={{ backgroundColor: `${col}0d`, border: `1px solid ${col}30` }}
-              >
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span className="font-mono font-semibold" style={{ color: col }}>{s.scene_id}</span>
-                  <span>{s.loc}</span>
+                <div key={i} className="rounded-lg p-3" style={{ backgroundColor: `${col}0f`, border: `1px solid ${col}33` }}>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span className="font-mono font-semibold" style={{ color: col }}>{s.scene_id}</span>
+                    <span>{s.loc}</span>
+                  </div>
+                  <p className="lab-serif mt-1.5 text-[14px]">{s.summary}</p>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {(s.characters ?? []).map((n: string, j: number) => {
+                      const key = matchCharacter(n, names) ?? n;
+                      const ccol = colors.get(key) ?? TONE.mild;
+                      return (
+                        <span key={j} className="inline-flex items-center gap-1 rounded-full bg-white/80 px-1.5 py-px text-[10px] text-foreground/80">
+                          <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: ccol }} />
+                          {n}
+                        </span>
+                      );
+                    })}
+                  </div>
                 </div>
-                <p className="mt-1.5 text-sm leading-snug">{s.summary}</p>
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {(s.characters ?? []).map((n: string, j: number) => {
-                    const key = matchCharacter(n, names) ?? n;
-                    const ccol = colors.get(key) ?? '#64748b';
-                    return (
-                      <span key={j} className="inline-flex items-center gap-1 rounded-full bg-background/50 px-1.5 py-px text-[10px] text-foreground/80">
-                        <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: ccol }} />
-                        {n}
-                      </span>
-                    );
-                  })}
-                </div>
-              </div>
               );
             })}
           </div>
@@ -307,37 +574,51 @@ function Step1({ out }: { out: any }) {
       )}
 
       {out.settings?.length > 0 && (
-        <Section title="설정 추출" sub="충돌·공백은 판정 카드(6단계)에서 작가 질문으로 이어집니다">
+        <Section
+          title="설정 추출"
+          sub="충돌·공백은 6단계 판정 카드에서 작가 질문으로 이어집니다"
+          legend={[
+            { color: TONE.severe, swatch: 'chip', label: '충돌', desc: '같은 항목에 값이 둘 이상' },
+            { color: TONE.warn, swatch: 'chip', label: '공백', desc: '값이 없는데 플롯이 기대는 항목' },
+            { color: TONE.good, swatch: 'chip', label: '일관', desc: '값이 하나로 맞음' },
+          ]}
+        >
           <div className="grid gap-2.5 sm:grid-cols-2">
-            {out.settings.map((s: any, i: number) => {
-              const sc = statusColor(s.status);
-              return (
-                <div key={i} className="rounded-lg border bg-background/60 p-3">
-                  <div className="flex items-center gap-2">
-                    <span className={`rounded-full border px-2 py-px text-[10px] font-semibold ${sc.badge}`}>{s.status}</span>
-                    <span className="text-sm font-semibold">{s.title}</span>
-                    {s.plot_depends && <span className="text-[10px] text-muted-foreground">플롯 의존</span>}
-                  </div>
-                  <ul className="mt-1.5 space-y-0.5">
-                    {(s.values ?? []).map((v: any, j: number) => (
-                      <li key={j} className="text-xs text-muted-foreground">
-                        <span className="text-foreground/70">{v.loc}</span> {v.value}
-                      </li>
-                    ))}
-                  </ul>
+            {out.settings.map((s: any, i: number) => (
+              <div key={i} className={CARD}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Chip color={settingTone(s.status)}>{s.status}</Chip>
+                  <span className="text-sm font-semibold">{s.title}</span>
+                  {s.plot_depends && <span className="text-[10px] text-muted-foreground">플롯 의존</span>}
                 </div>
-              );
-            })}
+                <ul className="mt-1.5 space-y-0.5">
+                  {(s.values ?? []).map((v: any, j: number) => (
+                    <li key={j} className="lab-serif text-[13px]">
+                      <span className="mr-1 font-sans text-[11px] font-semibold text-muted-foreground">{v.loc}</span>
+                      {v.value}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </div>
         </Section>
       )}
 
       {out.emotion_arcs?.length > 0 && (
-        <Section title="인물별 감정 흐름" sub="진한 칩 = 강 / 테두리만 = 약 · 큰 칩 = 전환점 (아래 줄 = 전환의 계기)">
+        <Section
+          title="인물별 감정 흐름"
+          legend={[
+            { color: TONE.neutral, swatch: 'fill', label: '강', desc: '진하게 칠한 칩' },
+            { color: TONE.neutral, swatch: 'chip', label: '중', desc: '옅게 칠한 칩' },
+            { color: TONE.neutral, swatch: 'outline', label: '약', desc: '테두리만 있는 칩' },
+          ]}
+          note="칩의 색은 인물 색입니다. 굵은 글씨에 실선 테두리를 두른 칩이 감정이 바뀐 전환점이고, 그 아래 ⚡ 줄이 전환을 일으킨 계기입니다."
+        >
           <div className="space-y-4">
             {out.emotion_arcs.map((arc: any, i: number) => {
               const key = matchCharacter(arc.character, names) ?? arc.character;
-              const col = colors.get(key) ?? '#64748b';
+              const col = colors.get(key) ?? TONE.mild;
               return (
                 <div key={i}>
                   <p className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold">
@@ -351,11 +632,11 @@ function Step1({ out }: { out: any }) {
                       return (
                         <div key={j} className="flex items-start">
                           {j > 0 && <span className="mx-1 mt-1.5 text-muted-foreground/50">›</span>}
-                          <div className="max-w-[160px]">
+                          <div className="max-w-[170px]">
                             <span
                               className={`inline-block rounded-md px-1.5 py-0.5 ${p.is_turning_point ? 'text-[12px] font-bold' : 'text-[11px]'}`}
                               style={{
-                                backgroundColor: strong ? `${col}38` : weak ? 'transparent' : `${col}20`,
+                                backgroundColor: strong ? `${col}38` : weak ? 'transparent' : `${col}17`,
                                 border: `1px ${p.is_turning_point ? 'solid' : 'dashed'} ${col}${p.is_turning_point ? '' : '80'}`,
                                 color: col,
                               }}
@@ -364,7 +645,7 @@ function Step1({ out }: { out: any }) {
                               {p.emotion}
                             </span>
                             {p.is_turning_point && p.trigger && (
-                              <p className="mt-0.5 text-[10px] leading-tight text-muted-foreground">⚡ {p.trigger}</p>
+                              <p className="lab-serif mt-0.5 text-[12px] text-muted-foreground">⚡ {p.trigger}</p>
                             )}
                           </div>
                         </div>
@@ -379,27 +660,38 @@ function Step1({ out }: { out: any }) {
       )}
 
       {out.knowledge_states?.length > 0 && (
-        <Section title="인물별 지식 상태" sub="장면이 끝날 때 무엇을 알고 · 믿고 · 모르는가">
+        <Section
+          title="인물별 지식 상태"
+          sub="장면이 끝날 때 무엇을 알고 · 믿고 · 모르는가"
+          legend={[
+            { color: TONE.good, swatch: 'chip', label: '안다', desc: '원고에서 확인된 사실' },
+            { color: TONE.belief, swatch: 'chip', label: '믿는다', desc: '사실과 다를 수 있는 믿음' },
+            { color: TONE.mild, swatch: 'chip', label: '모른다', desc: '아직 알지 못하는 것' },
+          ]}
+          note="이름 앞 점의 색은 인물 색입니다."
+        >
           <div className="space-y-3">
             {names
               .filter((n: string) => (out.knowledge_states ?? []).some((k: any) => matchCharacter(k.character, names) === n))
               .map((n: string) => {
-                const col = colors.get(n) ?? '#64748b';
+                const col = colors.get(n) ?? TONE.mild;
                 const rows = (out.knowledge_states ?? []).filter((k: any) => matchCharacter(k.character, names) === n);
                 return (
-                  <div key={n} className="rounded-lg border bg-background/60 p-3">
+                  <div key={n} className={CARD}>
                     <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold">
                       <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: col }} />
                       {n}
                     </p>
-                    <div className="space-y-2">
+                    <div className="space-y-2.5">
                       {rows.map((k: any, i: number) => (
-                        <div key={i} className="grid gap-x-3 gap-y-0.5 text-xs sm:grid-cols-[90px_1fr]">
-                          <span className="font-mono text-muted-foreground">{k.scene_id} {k.loc}</span>
-                          <div className="space-y-0.5">
-                            {k.knows?.length > 0 && <p><span className="mr-1 rounded bg-emerald-500/15 px-1 text-[10px] text-emerald-300">안다</span>{k.knows.join(' · ')}</p>}
-                            {k.believes?.length > 0 && <p><span className="mr-1 rounded bg-sky-500/15 px-1 text-[10px] text-sky-300">믿는다</span>{k.believes.join(' · ')}</p>}
-                            {k.does_not_know?.length > 0 && <p className="text-muted-foreground"><span className="mr-1 rounded bg-zinc-500/20 px-1 text-[10px] text-zinc-400">모른다</span>{k.does_not_know.join(' · ')}</p>}
+                        <div key={i} className="grid gap-x-3 gap-y-0.5 sm:grid-cols-[90px_1fr]">
+                          <span className="font-mono text-xs text-muted-foreground">{k.scene_id} {k.loc}</span>
+                          <div className="lab-serif space-y-0.5 text-[13px]">
+                            {k.knows?.length > 0 && <p><KnowTag color={TONE.good}>안다</KnowTag>{k.knows.join(' · ')}</p>}
+                            {k.believes?.length > 0 && <p><KnowTag color={TONE.belief}>믿는다</KnowTag>{k.believes.join(' · ')}</p>}
+                            {k.does_not_know?.length > 0 && (
+                              <p className="text-muted-foreground"><KnowTag color={TONE.mild}>모른다</KnowTag>{k.does_not_know.join(' · ')}</p>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -415,10 +707,10 @@ function Step1({ out }: { out: any }) {
         <Section title="반복 장치" sub="첫 등장 → 재등장 위치">
           <div className="grid gap-2.5 sm:grid-cols-2">
             {out.devices.map((d: any, i: number) => (
-              <div key={i} className="rounded-lg border bg-background/60 p-3 text-sm">
-                <p className="font-semibold">🔁 {d.name}</p>
-                <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-                  <span className="text-foreground/70">{d.first?.loc}</span> “{d.first?.quote}”
+              <div key={i} className={CARD}>
+                <p className="text-sm font-semibold">🔁 {d.name}</p>
+                <p className="lab-serif mt-1 text-[13px] text-foreground/75">
+                  <span className="mr-1 font-sans text-[11px] font-semibold text-muted-foreground">{d.first?.loc}</span>“{d.first?.quote}”
                 </p>
                 {(d.recurrences ?? []).length > 0 && (
                   <p className="mt-1 text-xs text-muted-foreground">
@@ -433,17 +725,28 @@ function Step1({ out }: { out: any }) {
 
       {out.timeline?.length > 0 && (
         <Section title="타임라인 메모" sub="경과 시간 역산 포함">
-          <ul className="space-y-1.5 text-sm">
+          <ul className="space-y-2">
             {out.timeline.map((t: any, i: number) => (
               <li key={i} className="flex gap-2">
                 <span className="text-muted-foreground">🕐</span>
-                <div>{t.note}<EvidenceList evidence={t.evidence} /></div>
+                <div>
+                  <p className="lab-serif text-[14px]">{t.note}</p>
+                  <EvidenceList evidence={t.evidence} />
+                </div>
               </li>
             ))}
           </ul>
         </Section>
       )}
     </div>
+  );
+}
+
+function KnowTag({ color, children }: { color: string; children: React.ReactNode }) {
+  return (
+    <span className="mr-1.5 inline-block rounded px-1 align-[1px] font-sans text-[10px] font-semibold" style={{ backgroundColor: `${color}1a`, color }}>
+      {children}
+    </span>
   );
 }
 
@@ -461,18 +764,18 @@ function Step2({ out }: { out: any }) {
       <Section title="원고의 약속" sub="이 원고가 스스로 세운 규칙 — 이후 모든 판단의 기준">
         <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
           {tiles.map((t, i) => (
-            <div key={i} className="rounded-lg border bg-background/60 p-3">
+            <div key={i} className={CARD}>
               <p className="text-[11px] text-muted-foreground">{t.label}</p>
-              <p className="mt-1 text-sm font-bold leading-snug">{t.value}</p>
+              <p className="lab-serif mt-1 text-sm font-bold">{t.value}</p>
             </div>
           ))}
         </div>
         {p.promises?.length > 0 && (
           <ul className="mt-3 space-y-1.5">
             {p.promises.map((x: string, i: number) => (
-              <li key={i} className="flex gap-2 text-sm">
-                <span className="text-primary">✓</span>
-                <span>{x}</span>
+              <li key={i} className="flex gap-2 text-[14px]">
+                <span className="font-semibold" style={{ color: TONE.good }}>✓</span>
+                <span className="lab-serif">{x}</span>
               </li>
             ))}
           </ul>
@@ -483,9 +786,9 @@ function Step2({ out }: { out: any }) {
         <Section title="장르 신호" sub="웃음·긴장이 만들어지는 기제">
           <div className="grid gap-2.5 sm:grid-cols-2">
             {p.genre_signals.map((g: any, i: number) => (
-              <div key={i} className="rounded-lg border bg-background/60 p-3 text-sm">
-                <p className="font-semibold">{g.signal}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">{g.mechanism}</p>
+              <div key={i} className={CARD}>
+                <p className="text-sm font-semibold">{g.signal}</p>
+                <p className="lab-serif mt-0.5 text-[13px] text-foreground/80">{g.mechanism}</p>
                 <EvidenceList evidence={g.evidence} />
               </div>
             ))}
@@ -497,7 +800,7 @@ function Step2({ out }: { out: any }) {
         <Section title="장면별 초점 인물">
           <div className="flex flex-wrap gap-1.5">
             {p.focal_characters.map((f: any, i: number) => (
-              <span key={i} className="rounded-md border bg-background/60 px-2 py-0.5 text-xs">
+              <span key={i} className="rounded-md border bg-background/70 px-2 py-0.5 text-xs">
                 <span className="font-mono text-muted-foreground">{f.scene_id}</span> <b>{f.character}</b>
               </span>
             ))}
@@ -512,13 +815,13 @@ function Step2({ out }: { out: any }) {
 function Step3Extra({ out }: { out: any }) {
   if (!out.planted?.length) return null;
   return (
-    <Section title={`심어둔 것 (planted) ${out.planted.length}건`} sub="다음 부에서 격발되는지 추적">
+    <Section title={`심어둔 것 ${out.planted.length}건`} sub="다음 부에서 격발되는지 추적">
       <div className="grid gap-2.5 sm:grid-cols-2">
         {out.planted.map((p: any, i: number) => (
-          <div key={i} className="rounded-lg border bg-background/60 p-3 text-sm">
-            <p className="font-semibold">🌱 {p.name} <span className="text-xs font-normal text-muted-foreground">({p.loc})</span></p>
-            <p className="mt-1 text-xs text-muted-foreground leading-relaxed">“{p.quote}”</p>
-            <p className="mt-1 text-xs"><span className="text-primary">→</span> {p.expected_fire}</p>
+          <div key={i} className={CARD}>
+            <p className="text-sm font-semibold">🌱 {p.name} <span className="text-xs font-normal text-muted-foreground">{p.loc}</span></p>
+            <p className="lab-serif mt-1 text-[13px] text-foreground/75">“{p.quote}”</p>
+            <p className="lab-serif mt-1 text-[13px]"><span className="font-sans text-muted-foreground">→</span> {p.expected_fire}</p>
           </div>
         ))}
       </div>
@@ -527,17 +830,19 @@ function Step3Extra({ out }: { out: any }) {
 }
 
 // ── 단계 6 보조: 총평·A급·작가 질문 (설정 항목은 판정 카드가 담당) ──
+const QUESTION_KINDS: Record<string, { label: string; color: string; desc: string }> = {
+  confirm: { label: '확인', color: TONE.belief, desc: '원고 내용이 의도대로인지 확인' },
+  choose: { label: '고를 것', color: TONE.warn, desc: '작가가 선택해야 할 갈림길' },
+  reference: { label: '참고', color: TONE.mild, desc: '판단에 참고할 정보' },
+};
+
 function Step6Extra({ out }: { out: any }) {
-  const kinds: Record<string, { label: string; cls: string }> = {
-    confirm: { label: '확인', cls: 'bg-sky-500/15 text-sky-300 border-sky-500/40' },
-    choose: { label: '고를 것', cls: 'bg-amber-500/15 text-amber-300 border-amber-500/40' },
-    reference: { label: '참고', cls: 'bg-zinc-500/20 text-zinc-300 border-zinc-500/40' },
-  };
+  const kindsUsed = Object.entries(QUESTION_KINDS).filter(([k]) => (out.author_questions ?? []).some((q: any) => q.kind === k));
   return (
     <div className="space-y-4">
       {out.summary && (
-        <section className="rounded-xl border-2 border-primary/50 bg-primary/5 p-5">
-          <p className="mb-2 flex items-center gap-2 text-xs font-bold tracking-widest text-primary">
+        <section className="rounded-xl border-2 border-foreground/15 bg-white p-6">
+          <p className="mb-3 flex items-center gap-2 text-xs font-bold tracking-widest text-foreground/70">
             총평
             {out.intervention && (
               <Badge variant={out.intervention === 'redesign' ? 'destructive' : 'secondary'}>
@@ -545,35 +850,35 @@ function Step6Extra({ out }: { out: any }) {
               </Badge>
             )}
           </p>
-          <p className="whitespace-pre-wrap text-[15px] leading-relaxed">{out.summary}</p>
+          <Prose text={out.summary} className="text-[16px]" />
         </section>
       )}
 
       {out.overall && (
         <Section title="작품 단위 평가">
-          <div className="grid gap-2.5 sm:grid-cols-2">
+          <div className="divide-y">
             {out.overall.logline && (
-              <div className="rounded-lg border bg-background/60 p-3 sm:col-span-2">
-                <p className="text-[11px] text-muted-foreground">한 문장으로</p>
-                <p className="mt-1 text-sm font-bold">{out.overall.logline}</p>
+              <div className="pb-4">
+                <FieldLabel>한 문장으로</FieldLabel>
+                <p className="lab-serif text-[16px] font-bold">{out.overall.logline}</p>
               </div>
             )}
             {out.overall.protagonist_arc && (
-              <div className="rounded-lg border bg-background/60 p-3">
-                <p className="text-[11px] text-muted-foreground">주인공의 궤적</p>
-                <p className="mt-1 text-sm leading-relaxed">{out.overall.protagonist_arc}</p>
+              <div className="py-4">
+                <FieldLabel>주인공의 궤적</FieldLabel>
+                <Prose text={out.overall.protagonist_arc} className="text-[15px]" />
               </div>
             )}
             {out.overall.structure && (
-              <div className="rounded-lg border bg-background/60 p-3">
-                <p className="text-[11px] text-muted-foreground">구조와 주제</p>
-                <p className="mt-1 text-sm leading-relaxed">{out.overall.structure}</p>
+              <div className="py-4">
+                <FieldLabel>구조와 주제</FieldLabel>
+                <Prose text={out.overall.structure} className="text-[15px]" />
               </div>
             )}
             {out.overall.readability_pattern && (
-              <div className="rounded-lg border bg-background/60 p-3 sm:col-span-2">
-                <p className="text-[11px] text-muted-foreground">읽히는 장면의 공통점</p>
-                <p className="mt-1 text-sm leading-relaxed">{out.overall.readability_pattern}</p>
+              <div className="pt-4">
+                <FieldLabel>읽히는 장면의 공통점</FieldLabel>
+                <Prose text={out.overall.readability_pattern} className="text-[15px]" />
               </div>
             )}
           </div>
@@ -582,28 +887,36 @@ function Step6Extra({ out }: { out: any }) {
 
       {out.intervention === 'redesign' && out.redesign && (
         <Section title="재설계 제안" sub="구조가 아직 서지 않은 원고로 판정됨 — 설계 수준의 수정안">
-          <div className="space-y-3 text-sm">
+          <div className="space-y-5 text-sm">
             {out.redesign.theme && (
-              <p><Badge variant="destructive" className="mr-2">테마 재정의</Badge>{out.redesign.theme}</p>
+              <div>
+                <FieldLabel>테마 재정의</FieldLabel>
+                <Prose text={out.redesign.theme} className="text-[15px]" />
+              </div>
             )}
             {out.redesign.title_proposal && (
-              <p>
-                <Badge variant="secondary" className="mr-2">제목 제안</Badge>
-                {Array.isArray(out.redesign.title_proposal) ? out.redesign.title_proposal.join(' / ') : out.redesign.title_proposal}
-              </p>
+              <div>
+                <FieldLabel>제목 제안</FieldLabel>
+                <p className="lab-serif text-[15px]">
+                  {Array.isArray(out.redesign.title_proposal) ? out.redesign.title_proposal.join(' / ') : out.redesign.title_proposal}
+                </p>
+              </div>
             )}
             {out.redesign.chapter_template && (
-              <p><Badge variant="secondary" className="mr-2">꼭지 템플릿</Badge>{out.redesign.chapter_template}</p>
+              <div>
+                <FieldLabel>꼭지 템플릿</FieldLabel>
+                <Prose text={out.redesign.chapter_template} className="text-[15px]" />
+              </div>
             )}
             {out.redesign.toc_proposal?.length > 0 && (
               <div>
-                <p className="mb-1.5 font-semibold">목차 수정안</p>
+                <FieldLabel>목차 수정안</FieldLabel>
                 <div className="space-y-1.5">
                   {out.redesign.toc_proposal.map((t: any, i: number) => (
-                    <div key={i} className="grid gap-1 rounded-lg border bg-background/60 p-2.5 text-xs sm:grid-cols-[1fr_auto_1fr]">
+                    <div key={i} className="lab-serif grid gap-1 rounded-lg border bg-background/70 p-2.5 text-[13px] sm:grid-cols-[1fr_auto_1fr]">
                       <span className="text-muted-foreground line-through decoration-muted-foreground/40">{t.current}</span>
-                      <span className="hidden text-primary sm:block">→</span>
-                      <span className="font-semibold whitespace-pre-wrap">{t.proposed}</span>
+                      <span className="hidden font-sans text-muted-foreground sm:block">→</span>
+                      <span className="whitespace-pre-wrap font-semibold">{t.proposed}</span>
                       {t.why && <p className="text-muted-foreground sm:col-span-3">∵ {t.why}</p>}
                     </div>
                   ))}
@@ -612,19 +925,20 @@ function Step6Extra({ out }: { out: any }) {
             )}
             {out.redesign.term_table?.length > 0 && (
               <div>
-                <p className="mb-1.5 font-semibold">용어·은유 통일표</p>
+                <FieldLabel>용어·은유 통일표</FieldLabel>
                 {out.redesign.term_table.map((t: any, i: number) => (
-                  <p key={i} className="mb-1 border-l-2 border-primary/40 pl-2 text-xs">
-                    {t.from} → <b>{t.to}</b> <span className="text-muted-foreground">({t.why})</span>
-                  </p>
+                  <div key={i} className="lab-serif mb-1.5 border-l-2 border-foreground/15 pl-2.5 text-[13px]">
+                    <p>{t.from} → <b>{t.to}</b></p>
+                    {t.why && <p className="text-muted-foreground">{t.why}</p>}
+                  </div>
                 ))}
               </div>
             )}
             {out.redesign.prescriptions?.length > 0 && (
               <div>
-                <p className="mb-1.5 font-semibold">수치 처방</p>
+                <FieldLabel>수치 처방</FieldLabel>
                 {out.redesign.prescriptions.map((p: any, i: number) => (
-                  <p key={i} className="mb-1 border-l-2 border-primary/40 pl-2 text-xs">
+                  <p key={i} className="lab-serif mb-1.5 border-l-2 border-foreground/15 pl-2.5 text-[13px]">
                     {p.what}: <b>{p.value}</b> <span className="text-muted-foreground">— {p.basis}</span>
                   </p>
                 ))}
@@ -632,15 +946,17 @@ function Step6Extra({ out }: { out: any }) {
             )}
             {out.redesign.synopsis_sketch && (
               <div>
-                <p className="mb-1.5 font-semibold">개정 서사 골격</p>
-                <p className="whitespace-pre-wrap rounded-lg border bg-background/60 p-3 text-xs leading-relaxed">{out.redesign.synopsis_sketch}</p>
+                <FieldLabel>개정 서사 골격</FieldLabel>
+                <div className="rounded-lg border bg-background/70 p-4">
+                  <Prose text={out.redesign.synopsis_sketch} className="text-[14px]" />
+                </div>
               </div>
             )}
             {out.redesign.references?.length > 0 && (
               <div>
-                <p className="mb-1.5 font-semibold">실존 모델·참고자료</p>
+                <FieldLabel>실존 모델·참고자료</FieldLabel>
                 {out.redesign.references.map((r: any, i: number) => (
-                  <p key={i} className="mb-1 border-l-2 border-primary/40 pl-2 text-xs">
+                  <p key={i} className="lab-serif mb-1.5 border-l-2 border-foreground/15 pl-2.5 text-[13px]">
                     {r.target}: <b>{r.model}</b> <span className="text-muted-foreground">— {r.how}</span>
                   </p>
                 ))}
@@ -648,12 +964,12 @@ function Step6Extra({ out }: { out: any }) {
             )}
             {out.redesign.timeline_proposal?.length > 0 && (
               <div>
-                <p className="mb-1.5 font-semibold">인물×시간 연표 제안</p>
+                <FieldLabel>인물×시간 연표 제안</FieldLabel>
                 <div className="space-y-1">
                   {out.redesign.timeline_proposal.map((t: any, i: number) => (
-                    <div key={i} className="flex gap-2 text-xs">
-                      <span className="w-20 shrink-0 font-mono text-muted-foreground">{t.year}</span>
-                      <div>
+                    <div key={i} className="flex gap-2 text-[13px]">
+                      <span className="w-20 shrink-0 font-mono text-xs text-muted-foreground">{t.year}</span>
+                      <div className="lab-serif">
                         {(t.entries ?? []).map((e: any, j: number) => (
                           <p key={j}><b>{e.character}</b> — {e.event}</p>
                         ))}
@@ -668,51 +984,74 @@ function Step6Extra({ out }: { out: any }) {
       )}
 
       {out.character_reviews?.length > 0 && (
-        <Section title="확실히 좋아서 더 살리고 싶은 것 — 인물별">
+        <Section
+          title="확실히 좋아서 더 살리고 싶은 것 — 인물별"
+          legend={[
+            { color: TONE.good, label: '빛나는 순간', desc: '살릴 장면' },
+            { color: TONE.warn, label: '흔들리는 지점', desc: '고칠 방향과 함께' },
+          ]}
+        >
           <div className="grid gap-2.5 sm:grid-cols-2">
-            {out.character_reviews.map((c: any, i: number) => {
-              const col = CHAR_COLORS[i % CHAR_COLORS.length];
-              return (
-                <div key={i} className="rounded-lg border bg-background/60 p-3 text-sm">
-                  <p className="flex items-center gap-2 font-bold">
-                    <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: col }} />
-                    {c.label || c.character}
-                  </p>
-                  {c.core_mechanism && <p className="mt-1 text-xs text-muted-foreground">핵심 기제 — {c.core_mechanism}</p>}
-                  {c.shining?.length > 0 && (
-                    <div className="mt-2">
-                      <p className="text-[11px] font-semibold text-emerald-300">✨ 빛나는 순간</p>
-                      {c.shining.map((s: any, j: number) => (
-                        <p key={j} className="mt-0.5 text-xs text-muted-foreground">· {s.loc} — {s.why}</p>
-                      ))}
-                    </div>
-                  )}
-                  {c.wobbles?.length > 0 && (
-                    <div className="mt-2">
-                      <p className="text-[11px] font-semibold text-amber-300">⚠ 흔들리는 지점</p>
-                      {c.wobbles.map((w: any, j: number) => (
-                        <p key={j} className="mt-0.5 text-xs text-muted-foreground">· {w.loc} — {w.problem} <span className="text-foreground/70">→ {w.direction}</span></p>
-                      ))}
-                    </div>
-                  )}
-                  {c.emotion_note && <p className="mt-2 text-xs">감정 흐름: {c.emotion_note}</p>}
-                </div>
-              );
-            })}
+            {out.character_reviews.map((c: any, i: number) => (
+              <div key={i} className={CARD}>
+                <p className="text-sm font-bold">{c.label || c.character}</p>
+                {c.core_mechanism && (
+                  <div className="mt-1.5"><FieldLabel>핵심 기제</FieldLabel><p className="lab-serif text-[13px]">{c.core_mechanism}</p></div>
+                )}
+                {c.shining?.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-[11px] font-semibold" style={{ color: TONE.good }}>✨ 빛나는 순간</p>
+                    {c.shining.map((s: any, j: number) => (
+                      <p key={j} className="lab-serif mt-0.5 text-[13px] text-foreground/80">
+                        <span className="mr-1 font-sans text-[11px] font-semibold text-muted-foreground">{s.loc}</span>{s.why}
+                      </p>
+                    ))}
+                  </div>
+                )}
+                {c.wobbles?.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-[11px] font-semibold" style={{ color: TONE.warn }}>⚠ 흔들리는 지점</p>
+                    {c.wobbles.map((w: any, j: number) => (
+                      <div key={j} className="lab-serif mt-0.5 text-[13px] text-foreground/80">
+                        <p><span className="mr-1 font-sans text-[11px] font-semibold text-muted-foreground">{w.loc}</span>{w.problem}</p>
+                        {w.direction && <p className="text-foreground"><span className="font-sans text-muted-foreground">→</span> {w.direction}</p>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {c.emotion_note && (
+                  <div className="mt-2"><FieldLabel>감정 흐름</FieldLabel><p className="lab-serif text-[13px]">{c.emotion_note}</p></div>
+                )}
+              </div>
+            ))}
           </div>
         </Section>
       )}
 
       {out.a_grade?.length > 0 && (
-        <Section title={`가장 큰 것 (A급) ${out.a_grade.length}건`} sub="구조를 흔드는 문제 — 1~3건만 고릅니다">
+        <Section
+          title={`가장 큰 것 — A급 ${out.a_grade.length}건`}
+          sub="1~3건만 고릅니다"
+          legend={[{ color: TONE.severe, swatch: 'chip', label: 'A급', desc: '구조를 흔드는 가장 큰 문제' }]}
+        >
           <div className="space-y-2.5">
             {out.a_grade.map((a: any, i: number) => (
-              <div key={i} className="flex gap-3 rounded-lg border border-red-500/30 bg-red-500/5 p-3 text-sm">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-red-500/20 font-bold text-red-300">{i + 1}</span>
-                <div>
-                  <p className="font-bold">{a.title}</p>
-                  <p className="mt-1 leading-relaxed">{a.problem}</p>
-                  <p className="mt-1 text-muted-foreground">→ {a.direction}</p>
+              <div key={i} className="flex gap-3 rounded-lg p-4" style={{ backgroundColor: `${TONE.severe}0a`, border: `1px solid ${TONE.severe}40` }}>
+                <span
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold"
+                  style={{ backgroundColor: `${TONE.severe}1f`, color: TONE.severe }}
+                >
+                  {i + 1}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[15px] font-bold">{a.title}</p>
+                  <Prose text={a.problem} className="mt-1.5 text-[15px]" />
+                  {a.direction && (
+                    <div className="mt-2.5">
+                      <FieldLabel>방향</FieldLabel>
+                      <Prose text={a.direction} className="text-[15px]" />
+                    </div>
+                  )}
                   <EvidenceList evidence={a.evidence} />
                 </div>
               </div>
@@ -722,17 +1061,20 @@ function Step6Extra({ out }: { out: any }) {
       )}
 
       {out.author_questions?.length > 0 && (
-        <Section title={`작가 질문 ${out.author_questions.length}건`}>
-          <div className="space-y-1.5 text-sm">
+        <Section
+          title={`작가 질문 ${out.author_questions.length}건`}
+          legend={kindsUsed.map(([, k]) => ({ color: k.color, swatch: 'chip' as const, label: k.label, desc: k.desc }))}
+        >
+          <div className="space-y-3">
             {out.author_questions.map((q: any, i: number) => {
-              const k = kinds[q.kind] ?? { label: q.kind, cls: 'bg-zinc-500/20 text-zinc-300 border-zinc-500/40' };
+              const k = QUESTION_KINDS[q.kind] ?? { label: q.kind, color: TONE.mild };
               return (
-                <div key={i} className="flex items-start gap-2">
-                  <span className={`mt-0.5 shrink-0 rounded border px-1.5 py-px text-[10px] ${k.cls}`}>{k.label}</span>
-                  <div>
-                    {q.question}
+                <div key={i} className="flex items-start gap-2.5">
+                  <Chip color={k.color} className="mt-1">{k.label}</Chip>
+                  <div className="min-w-0">
+                    <p className="lab-serif text-[14px]">{q.question}</p>
                     {q.options?.length > 0 && (
-                      <span className="text-xs text-muted-foreground"> (후보: {q.options.join(' / ')})</span>
+                      <p className="mt-0.5 text-xs text-muted-foreground">후보 — {q.options.join(' / ')}</p>
                     )}
                   </div>
                 </div>

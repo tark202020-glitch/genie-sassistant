@@ -1,0 +1,45 @@
+/* 피드백 랩 타이포그래피 — 제목·라벨·칩은 고딕 유지, 에이전트가 쓴 글(본문)은 KoPub 바탕 */
+
+@font-face {
+  font-family: 'KoPub Batang';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('https://cdn.jsdelivr.net/npm/@noonnu/ko-pub-batang@0.1.0/fonts/kopub-batang-400.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'KoPub Batang';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('https://cdn.jsdelivr.net/npm/@noonnu/ko-pub-batang@0.1.0/fonts/kopub-batang-700.woff2') format('woff2');
+}
+
+/* 짧은 본문(카드 한 줄·인용) — 서체와 행간만 */
+.lab-serif {
+  font-family: 'KoPub Batang', 'Noto Serif KR', serif;
+  line-height: 1.75;
+  word-break: keep-all;
+}
+
+/* 긴 글 — 줄바꿈 = 문단(첫 줄 들여쓰기), 빈 줄 = 단락(넓은 간격) */
+.lab-prose {
+  font-family: 'KoPub Batang', 'Noto Serif KR', serif;
+  line-height: 1.8;
+  word-break: keep-all;
+  max-width: 44em;
+}
+
+.lab-prose p {
+  margin: 0;
+  text-indent: 1em;
+}
+
+.lab-prose p + p {
+  margin-top: 0.6em;
+}
+
+.lab-prose .lab-block + .lab-block {
+  margin-top: 1.4em;
+}

@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2 } from 'lucide-react';
-import { StepOutputView, EvidenceList, LindaMark } from './step-views';
+import { StepOutputView, EvidenceList, LindaMark, Chip, Legend, Prose, TONE, type LegendItem } from './step-views';
 import { LINDA_RULE_IDS } from '@/lib/lab/rules';
 import { estimateCost } from '@/lib/lab/pricing';
 
@@ -30,15 +30,36 @@ const TYPE_LABEL: Record<string, string> = {
   line_edit: '첨삭',
 };
 
-/** 유형·등급별 강조색 — 왼쪽 띠가 아니라 유형 칩의 틴트로 쓴다 */
+/** 유형·등급별 강조색 — 왼쪽 띠가 아니라 유형 칩의 틴트로 쓴다 (색은 step-views의 TONE 단일 출처) */
 function accentOf(item: Item): string {
   const p = item.payload;
-  if (item.item_type === 'strength') return '#34d399';
-  if (item.item_type === 'issue') return p.grade === 'A' ? '#f87171' : p.grade === 'B' ? '#fbbf24' : '#94a3b8';
-  if (item.item_type === 'line_edit') return '#a78bfa';
-  if (item.item_type === 'question') return '#22d3ee';
-  if (item.item_type === 'setting') return p.status === '충돌' ? '#f87171' : p.status === '공백' ? '#fbbf24' : '#34d399';
-  return '#64748b';
+  if (item.item_type === 'strength') return TONE.good;
+  if (item.item_type === 'issue') return p.grade === 'A' ? TONE.severe : p.grade === 'B' ? TONE.warn : TONE.mild;
+  if (item.item_type === 'line_edit') return TONE.lineEdit;
+  if (item.item_type === 'question') return TONE.question;
+  if (item.item_type === 'setting') return p.status === '충돌' ? TONE.severe : p.status === '공백' ? TONE.warn : TONE.good;
+  return TONE.mild;
+}
+
+/** 판정 항목 범례 — 그 단계에 실제로 나온 유형만 보인다 */
+function itemLegend(items: Item[]): LegendItem[] {
+  const has = (f: (i: Item) => boolean) => items.some(f);
+  const isIssue = (g: string | null) => (i: Item) =>
+    i.item_type === 'issue' && (g ? i.payload.grade === g : !['A', 'B'].includes(i.payload.grade));
+  const isSetting = (s: string | null) => (i: Item) =>
+    i.item_type === 'setting' && (s ? i.payload.status === s : !['충돌', '공백'].includes(i.payload.status));
+  const all: [boolean, LegendItem][] = [
+    [has((i) => i.item_type === 'strength'), { color: TONE.good, swatch: 'chip', label: '장점', desc: '살릴 것' }],
+    [has(isIssue('A')), { color: TONE.severe, swatch: 'chip', label: '결함 A급', desc: '가장 무거움' }],
+    [has(isIssue('B')), { color: TONE.warn, swatch: 'chip', label: '결함 B급', desc: '중간' }],
+    [has(isIssue(null)), { color: TONE.mild, swatch: 'chip', label: '결함 C급', desc: '가벼움' }],
+    [has((i) => i.item_type === 'line_edit'), { color: TONE.lineEdit, swatch: 'chip', label: '첨삭', desc: '원문과 나란히 놓은 문장 다듬기 제안' }],
+    [has((i) => i.item_type === 'question'), { color: TONE.question, swatch: 'chip', label: '질문', desc: '작가에게 물을 것' }],
+    [has(isSetting('충돌')), { color: TONE.severe, swatch: 'chip', label: '설정 충돌', desc: '같은 항목에 값이 둘 이상' }],
+    [has(isSetting('공백')), { color: TONE.warn, swatch: 'chip', label: '설정 공백', desc: '값이 없는데 플롯이 기대는 항목' }],
+    [has(isSetting(null)), { color: TONE.good, swatch: 'chip', label: '설정 일관', desc: '값이 하나로 맞음' }],
+  ];
+  return all.filter(([show]) => show).map(([, item]) => item);
 }
 
 interface Item {
@@ -90,41 +111,54 @@ function ItemCard({
 
   const accent = accentOf(item);
   return (
-    <Card className={v ? 'opacity-80' : ''}>
+    <Card className={`bg-white ${v ? 'opacity-80' : ''}`}>
       <CardContent className="pt-4 space-y-2">
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <div className="flex items-center gap-2">
-              <span
-                className="rounded-full px-2 py-px text-[11px] font-semibold"
-                style={{ backgroundColor: `${accent}1f`, color: accent, border: `1px solid ${accent}45` }}
-              >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <Chip color={accent}>
                 {TYPE_LABEL[item.item_type]}
                 {item.item_type === 'issue' && p.grade ? ` ${p.grade}급` : ''}
-              </span>
+              </Chip>
               {p.status && <Badge variant="secondary">{p.status}</Badge>}
               <span
-                className={`font-medium text-sm ${LINDA_RULE_IDS.has(p.rule_id) ? 'underline decoration-dotted decoration-amber-400/70 underline-offset-4' : ''}`}
+                className={`font-semibold text-sm ${LINDA_RULE_IDS.has(p.rule_id) ? 'underline decoration-dotted underline-offset-4' : ''}`}
+                style={LINDA_RULE_IDS.has(p.rule_id) ? { textDecorationColor: TONE.linda } : undefined}
               >
                 {title}
               </span>
               {LINDA_RULE_IDS.has(p.rule_id) && <LindaMark />}
             </div>
-            <p className="text-sm mt-1">
-              {p.diagnosis || p.mechanism || p.question || p.protect || p.comment || ''}
-            </p>
+            <Prose
+              text={p.diagnosis || p.mechanism || p.question || p.protect || p.comment}
+              className="mt-2 text-[15px]"
+            />
             {item.item_type === 'line_edit' && (
-              <div className="mt-1 space-y-0.5 text-xs">
-                {p.quote && <p className="text-muted-foreground border-l-2 pl-2">원문: “{p.quote}”</p>}
-                {p.suggestion && <p className="border-l-2 border-primary pl-2">제안: “{p.suggestion}”</p>}
+              <div className="lab-serif mt-2 space-y-1 text-[14px]">
+                {p.quote && (
+                  <p className="border-l-2 border-foreground/15 pl-2.5 text-muted-foreground">
+                    <span className="mr-1.5 font-sans text-[11px] font-semibold">원문</span>“{p.quote}”
+                  </p>
+                )}
+                {p.suggestion && (
+                  <p className="border-l-2 pl-2.5" style={{ borderColor: TONE.lineEdit }}>
+                    <span className="mr-1.5 font-sans text-[11px] font-semibold" style={{ color: TONE.lineEdit }}>제안</span>“{p.suggestion}”
+                  </p>
+                )}
               </div>
             )}
-            {p.direction && <p className="text-sm text-muted-foreground">→ {p.direction}</p>}
+            {p.direction && (
+              <div className="mt-2.5">
+                <p className="mb-1 text-xs font-semibold text-muted-foreground">방향</p>
+                <Prose text={p.direction} className="text-[15px] text-foreground/85" />
+              </div>
+            )}
             {item.item_type === 'setting' && p.values?.length > 0 && (
-              <ul className="mt-1 space-y-0.5">
+              <ul className="mt-2 space-y-0.5">
                 {p.values.map((v: any, i: number) => (
-                  <li key={i} className="text-xs text-muted-foreground border-l-2 pl-2">
-                    <span className="font-medium">{v.loc}</span> {v.value ?? v.quote ?? ''}
+                  <li key={i} className="lab-serif border-l-2 border-foreground/15 pl-2.5 text-[13px] text-foreground/75">
+                    <span className="mr-1 font-sans text-[11px] font-semibold text-muted-foreground">{v.loc}</span>
+                    {v.value ?? v.quote ?? ''}
                   </li>
                 ))}
               </ul>
@@ -339,9 +373,17 @@ export default function RunDetailPage() {
                   <StepOutputView step={s} output={st.output} />
                   {stepItems.length > 0 && (
                     <div className="space-y-3">
-                      {['4', '5'].includes(s) === false && stepItems.length > 0 && (
-                        <p className="text-sm font-medium text-muted-foreground mt-2">판정 항목</p>
-                      )}
+                      <div className="mt-2">
+                        <p className="mb-2 text-sm font-semibold text-muted-foreground">판정 항목 {stepItems.length}건</p>
+                        <Legend
+                          items={itemLegend(stepItems)}
+                          note={
+                            stepItems.some((i) => LINDA_RULE_IDS.has(i.payload?.rule_id))
+                              ? '제목의 점선 밑줄과 「린다」 표식은 『시나리오 거듭나기』 원칙에서 온 점검이라는 뜻입니다. 채택·기각 판정이 린다포인트 자체의 유효성 평가로도 쓰입니다.'
+                              : undefined
+                          }
+                        />
+                      </div>
                       {stepItems.map((it) => (
                         <ItemCard key={it.id} item={it} staged={staged[it.id]} onStage={handleStage} />
                       ))}

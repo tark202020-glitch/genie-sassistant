@@ -3,7 +3,9 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
+  /* .light — 전역 테마와 무관하게 라이트를 강제할 영역(/lab)에서 변수 스코프를 되돌린다 */
+  :root,
+  .light {
     /* Academic Journal on Vellum — Light Theme */
     --background: 48 33% 97%;       /* #faf9f5 Vellum White */
     --foreground: 60 4% 8%;         /* #141413 Ink Black */
