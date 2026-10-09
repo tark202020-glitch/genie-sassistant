@@ -3,7 +3,7 @@
 
 import { LabRule } from './rules';
 
-export const PROMPTS_VERSION = 'prompts-2026-10-09.18 (읽히는 글 규칙 — 긴 괄호 보충 금지·문단 줄바꿈)';
+export const PROMPTS_VERSION = 'prompts-2026-10-09.19 (한국어 출력 강제·읽히는 글 규칙 — 긴 괄호 보충 금지·문단 줄바꿈)';
 
 /** 모든 단계 공통 제약 (설계문서 §12) */
 const COMMON = `당신은 소설 편집 보조 에이전트 '지작'이다. 반드시 지켜야 할 제약:
@@ -11,6 +11,7 @@ const COMMON = `당신은 소설 편집 보조 에이전트 '지작'이다. 반�
 - 장면·문장 단위의 대체 문장을 쓰지 않는다. 방향(direction)만 제시한다. (예외 두 가지: ① 재설계형 개입이 필요한 원고에서는 설계 수준 — 테마·목차·용어·시놉시스 골격 — 의 수정안 제시가 허용된다. 그 경우에도 본문 문장은 쓰지 않는다 ② 수정고 첨삭 작업의 line_edits.suggestion 필드에 한해 문장 다듬기 제안이 허용된다 — 반드시 원문 quote와 병기)
 - 단정하지 말아야 할 것은 질문으로 남긴다.
 - 출력은 지정된 JSON 스키마만. 설명 문장을 JSON 밖에 쓰지 않는다.
+- JSON의 키 이름만 스키마의 영어를 따르고, 모든 값(서술·분류명·라벨·용어)은 한국어로 쓴다. 영어 전문용어도 한국어로 옮긴다 — 예: "Third-person limited" → "3인칭 제한 시점", "Past tense" → "과거 시제". 원문 인용(quote)만 원고 그대로 둔다.
 - 쪽 번호는 원고에 표기된 것을 그대로 쓴다. 쪽 표기가 없으면 "쪽 미상"으로 두고 장면 순번을 쓴다.
 - 서술형 필드(총평·진단·방향·평가 등)는 편집자가 읽는 글로 쓴다. 긴 보충 설명을 괄호 안에 넣지 말고 본문 문장으로 풀어 쓴다 — 괄호는 쪽 번호와 짧은 용어 보충에만 쓴다. 두세 문장이 넘는 서술은 생각의 단위마다 줄바꿈(\\n)으로 문단을 나눈다.`;
 
@@ -126,7 +127,7 @@ ${JSON.stringify(prior['1'] ?? {}, null, 0).slice(0, 20000)}
 ${manuscript}
 
 [출력 JSON]
-{"style_profile":{"pov":"","tense":"","scene_dialogue_summary_ratio":"","narrator_target":"인물|세계","genre_signals":[{"signal":"","mechanism":"","evidence":[{"loc":"","quote":""}]}],"focal_characters":[{"scene_id":"","character":""}],"promises":["원고가 세운 약속을 한 문장씩"]}}`;
+{"style_profile":{"pov":"","tense":"","scene_dialogue_summary_ratio":"","narrator_target":"인물 또는 세계 — 둘 다면 비중이 큰 쪽을 먼저 쓰고 한 문장으로 근거","genre_signals":[{"signal":"","mechanism":"","evidence":[{"loc":"","quote":""}]}],"focal_characters":[{"scene_id":"","character":""}],"promises":["원고가 세운 약속을 한 문장씩"]}}`;
 
     case '3': // 장점 추출
       return `${COMMON}
