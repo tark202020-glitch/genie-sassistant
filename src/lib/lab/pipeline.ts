@@ -2,7 +2,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { labDb as supabase } from '@/lib/lab/db';
 import { buildStepPrompt } from './prompts';
-import { rulesForMode } from './rules';
+import { rulesForMode, rulesForTextType } from './rules';
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY || '');
 
@@ -185,7 +185,7 @@ export async function advanceRun(runId: string): Promise<AdvanceResult> {
       authorContext,
       mode: run.mode,
       prior,
-      rules: rulesForMode(run.mode as LabMode),
+      rules: rulesForTextType(rulesForMode(run.mode as LabMode), (prior['1'] as any)?.text_type?.type),
     });
 
     const model = genAI.getGenerativeModel({

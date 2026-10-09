@@ -296,3 +296,14 @@ export function rulesForMode(mode: 'I' | 'D' | 'R' | 'F'): LabRule[] {
       return LAB_RULES;
   }
 }
+
+/**
+ * 글 종류별 활성 규칙 — 단계 1이 판별한 text_type으로 전용 규칙을 코드에서 거른다.
+ * 에세이면 소설 전용(R45~R49 린다포인트), 소설이면 에세이 전용(E1~E11)을 뺀다.
+ * 판별 결과가 없으면 거르지 않는다 (프롬프트의 텍스트 유형 분기에 맡김).
+ */
+export function rulesForTextType(rules: LabRule[], textType?: string): LabRule[] {
+  if (textType === 'essay') return rules.filter((r) => r.domain !== 'fiction');
+  if (textType === 'fiction') return rules.filter((r) => r.domain !== 'essay');
+  return rules;
+}
