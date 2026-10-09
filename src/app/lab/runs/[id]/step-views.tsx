@@ -4,6 +4,18 @@
 // 디자인 원칙: 다크 고정(/lab 레이아웃), 인물별 컬러 체계 공유, 표보다 카드·다이어그램
 import { Badge } from '@/components/ui/badge';
 
+/** 린다포인트 표식 — 『시나리오 거듭나기』 유래 산출물 구분 (원칙 문서 §3) */
+export function LindaMark() {
+  return (
+    <span
+      className="inline-flex items-center rounded-sm border border-amber-400/50 bg-amber-400/10 px-1 py-px align-middle text-[9px] font-bold tracking-wider text-amber-300"
+      title="린다포인트 — 『시나리오 거듭나기』(린다 시거) 원칙에서 유래한 점검"
+    >
+      린다
+    </span>
+  );
+}
+
 // ── 인물별 컬러 체계 (모든 뷰가 공유: 관계도·장면 카드·감정 흐름·지식 표) ──
 const CHAR_COLORS = ['#60a5fa', '#f472b6', '#34d399', '#fbbf24', '#a78bfa', '#f87171', '#22d3ee', '#fb923c', '#a3e635', '#e879f9'];
 
@@ -36,15 +48,76 @@ export function EvidenceList({ evidence }: { evidence: any[] }) {
   );
 }
 
-function Section({ title, sub, children }: { title: string; sub?: string; children: React.ReactNode }) {
+function Section({ title, sub, linda, children }: { title: string; sub?: string; linda?: boolean; children: React.ReactNode }) {
   return (
     <section className="rounded-xl border bg-card/60 p-4">
       <div className="mb-3 flex items-baseline gap-2">
-        <h3 className="text-sm font-bold tracking-wide">{title}</h3>
+        <h3 className="text-sm font-bold tracking-wide">
+          {title}
+          {linda && <span className="ml-1.5"><LindaMark /></span>}
+        </h3>
         {sub && <span className="text-xs text-muted-foreground">{sub}</span>}
       </div>
       {children}
     </section>
+  );
+}
+
+// ── 스토리 골격 트랙 (린다포인트) — 골격 요소를 분량 비율 위에 배치 ──
+const SPINE_LABELS: Record<string, string> = {
+  catalyst: '카타리스트',
+  turning_point_1: '제1전환점',
+  midpoint: '미드포인트',
+  low_point: '로우포인트',
+  climax: '클라이맥스',
+};
+
+function StorySpine({ spine }: { spine: any }) {
+  if (!spine) return null;
+  const keys = ['catalyst', 'turning_point_1', 'midpoint', 'low_point', 'climax'];
+  const items = keys
+    .map((k) => ({ key: k, ...(spine[k] ?? {}) }))
+    .filter((e) => e && (e.loc || e.summary));
+  const placed = items.filter((e) => typeof e.percent === 'number' && e.percent > 0 && e.loc !== '부재');
+  return (
+    <Section title="스토리 골격" sub="카타리스트 → 전환점 → 미드포인트 → 로우포인트 → 클라이맥스 (위치 = 분량 비율)" linda>
+      {spine.central_question && (
+        <p className="mb-3 rounded-lg border border-amber-400/30 bg-amber-400/5 px-3 py-2 text-sm">
+          <span className="mr-1.5 text-[11px] font-bold text-amber-300">중심 질문</span>
+          {spine.central_question}
+        </p>
+      )}
+      {placed.length > 0 && (
+        <div className="relative mx-2 mb-10 mt-6 h-1 rounded bg-muted">
+          {placed.map((e) => (
+            <div key={e.key} className="absolute -translate-x-1/2" style={{ left: `${Math.min(Math.max(e.percent, 2), 98)}%` }}>
+              <div className="mx-auto h-3 w-3 -translate-y-1 rounded-full border-2 border-amber-400 bg-background" />
+              <p className="mt-1 w-16 -translate-x-1/2 text-center text-[9px] leading-tight text-muted-foreground" style={{ marginLeft: '50%' }}>
+                {SPINE_LABELS[e.key]}
+                <br />{e.percent}%
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="space-y-1.5 text-xs">
+        {items.map((e) => (
+          <div key={e.key} className="flex gap-2">
+            <span className={`w-20 shrink-0 font-semibold ${e.loc === '부재' || e.loc === '미도달' ? 'text-red-300' : 'text-amber-300/90'}`}>
+              {SPINE_LABELS[e.key]}
+            </span>
+            <span className="text-muted-foreground">
+              <span className="text-foreground/70">{e.loc}{typeof e.percent === 'number' && e.percent > 0 ? ` (${e.percent}%)` : ''}</span>
+              {e.summary ? ` — ${e.summary}` : ''}
+              {e.key === 'low_point' && e.new_info_follows === false && (
+                <span className="ml-1 text-red-300">· 뒤따르는 새 정보 없음</span>
+              )}
+            </span>
+          </div>
+        ))}
+        {spine.note && <p className="mt-1 text-amber-200/80">※ {spine.note}</p>}
+      </div>
+    </Section>
   );
 }
 
@@ -195,6 +268,8 @@ function Step1({ out }: { out: any }) {
           <CharacterGraph characters={chars} arcs={out.emotion_arcs ?? []} />
         </Section>
       )}
+
+      {out.story_spine && <StorySpine spine={out.story_spine} />}
 
       {out.scenes?.length > 0 && (
         <Section title={`장면 ${out.scenes.length}개`} sub="카드 색 = 첫 등장 인물">

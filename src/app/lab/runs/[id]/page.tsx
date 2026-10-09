@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2 } from 'lucide-react';
-import { StepOutputView, EvidenceList } from './step-views';
+import { StepOutputView, EvidenceList, LindaMark } from './step-views';
+import { LINDA_RULE_IDS } from '@/lib/lab/rules';
 import { estimateCost } from '@/lib/lab/pricing';
 
 const STEP_LABEL: Record<string, string> = {
@@ -102,7 +103,12 @@ function ItemCard({
                 {item.item_type === 'issue' && p.grade ? ` ${p.grade}급` : ''}
               </span>
               {p.status && <Badge variant="secondary">{p.status}</Badge>}
-              <span className="font-medium text-sm">{title}</span>
+              <span
+                className={`font-medium text-sm ${LINDA_RULE_IDS.has(p.rule_id) ? 'underline decoration-dotted decoration-amber-400/70 underline-offset-4' : ''}`}
+              >
+                {title}
+              </span>
+              {LINDA_RULE_IDS.has(p.rule_id) && <LindaMark />}
             </div>
             <p className="text-sm mt-1">
               {p.diagnosis || p.mechanism || p.question || p.protect || p.comment || ''}
